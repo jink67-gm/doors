@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MATH DOORS — 3D 모델 확인실</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#080b10;color:#f7efe3;font-family:system-ui,'Malgun Gothic',sans-serif}header{padding:15px 20px;background:#191719;border-bottom:1px solid #665137;display:flex;justify-content:space-between;gap:15px;align-items:center;flex-wrap:wrap}h1{font-size:19px;margin:0}p{font-size:13px;color:#c4b3a0;line-height:1.6;margin:5px 0}.layout{display:flex;height:calc(100dvh - 77px)}aside{width:225px;min-width:225px;overflow-y:auto;background:#17151a;padding:12px;display:flex;flex-direction:column;gap:7px}button{background:#2a2627;color:#f1e9dd;border:1px solid #755c3e;border-radius:9px;padding:11px 10px;text-align:left;cursor:pointer;font-size:13px}button.selected,button:hover{background:#704628;border-color:#f4c072}.right{position:relative;flex:1;overflow:hidden}#viewport{width:100%;height:100%;touch-action:none}#tip{position:absolute;bottom:18px;left:20px;right:15px;font-size:13px;color:#ffdcaa;pointer-events:none;text-shadow:0 1px 4px #000}#status{font-size:12px;color:#ffe5bc}a{color:#ffd18e}@media(max-width:640px){.layout{flex-direction:column}aside{width:100%;min-width:unset;height:auto;flex-direction:row;overflow-x:auto}button{min-width:120px;text-align:center}.right{min-height:65vh;flex:1}}
+</style>
+<script src="assets/vendor/three.min.js"></script><script>if(!window.THREE){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');}</script>
+<script src="assets/js/procedural-props.js"></script>
+</head><body>
+<header><div><h1>MATH DOORS · 실물 3D 에셋 확인실</h1><p>모델을 드래그하여 앞·뒤·옆을 확인하세요. 서랍·옷장·문은 열림/닫힘 모습을 자동 반복합니다.</p></div><a href="index.html">← 게임으로 이동</a></header>
+<div class="layout"><aside id="choices"></aside><main class="right"><div id="viewport"></div><div id="tip">드래그: 회전 · 휠: 확대/축소 · 실제 3D 메쉬 모델 (평면 이미지 아님)</div></main></div>
+<script>
+(function(){
+ if(!window.THREE||!window.MathDoorsProps){document.getElementById('tip').textContent='Three.js를 불러오지 못했습니다. 인터넷 연결과 CDN 차단 여부를 확인하세요.';return;}
+ const T=THREE,P=MathDoorsProps;
+ const container=document.getElementById('viewport');
+ const renderer=new T.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(container.clientWidth,container.clientHeight);renderer.setClearColor(0x131821);container.appendChild(renderer.domElement);
+ const scene=new T.Scene();scene.fog=new T.Fog(0x131821,20,60);
+ scene.add(new T.AmbientLight(0xd8e6ff,.85));const key=new T.DirectionalLight(0xffd4a1,1.2);key.position.set(5,9,6);scene.add(key);const fill=new T.DirectionalLight(0x94bafa,.45);fill.position.set(-5,4,-4);scene.add(fill);
+ const floor=new T.Mesh(new T.CircleGeometry(12,64),new T.MeshStandardMaterial({color:0x32323a,roughness:.88}));floor.rotation.x=-Math.PI/2;floor.position.y=-.02;scene.add(floor);
+ const camera=new T.PerspectiveCamera(55,container.clientWidth/container.clientHeight,.1,100);
+ const selections=[
+  ['wardrobe','양문 옷장 · 내부·문 회전',()=>P.createWardrobe(0,0,true)],
+  ['drawer','서랍장 · 수납 공간·아이템',()=>P.createDrawer(0,0,0,'key')],
+  ['door','호텔 문 · 몰딩·양면 패널',()=>{const g=new T.Group();const mat=new T.MeshStandardMaterial({color:0x56341f,roughness:.7});const pivot=new T.Group();pivot.position.set(-1.2,0,0);const leaf=new T.Mesh(new T.BoxGeometry(2.4,3.6,.15),mat);leaf.position.set(1.2,1.8,0);pivot.add(leaf);P.decorateDoorLeaf(leaf,2.4,3.6);g.add(pivot);P.trimDoorFrame(g,0,0,2.4,3.6);return {group:g,pivot}}],
+  ['terminal','수학 제어 장치',()=>({group:P.createTerminal('stand')})],
+  ['keypad','3D 숫자 키패드',()=>({group:P.createTerminal('keypad')})],
+  ['bridge','판자 다리 · 난간·못',()=>({group:P.createBridge(3.4,6)})],
+  ['gear','잠금 톱니장치',()=>({group:P.createGearLock()})],
+  ['bookshelf','도서관 책장 · 개별 책',()=>({group:P.createBookshelf()})],
+  ['crates','창고 나무 상자',()=>({group:P.createCrates()})],
+ ];
+ const sidebar=document.getElementById('choices');let model=null,holder=null,yaw=.4,pitch=.22,dist=7,center=new T.Vector3(0,1.5,0),name='';
+ function load(id){
+  if(holder){scene.remove(holder)} const def=selections.find(x=>x[0]===id); if(!def)return;
+  model=def[2]();holder=new T.Group();scene.add(holder);holder.add(model.group);
+  const bbox=new T.Box3().setFromObject(model.group);const center0=bbox.getCenter(new T.Vector3());
+  model.group.position.sub(center0); const sz=bbox.getSize(new T.Vector3());
+  dist=Math.max(4,Math.max(sz.x,sz.y,sz.z)*2.25);yaw=.5;pitch=.18;
+  document.querySelectorAll('#choices button').forEach(b=>b.classList.toggle('selected',b.dataset.id===id));
+  name=id;
+ }
+ for(const [id,label] of selections){const b=document.createElement('button');b.textContent=label;b.dataset.id=id;b.onclick=()=>load(id);sidebar.appendChild(b)}
+ let dragging=false,prevX=0,prevY=0;
+ renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;prevX=e.clientX;prevY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)});
+ renderer.domElement.addEventListener('pointerup',()=>dragging=false);
+ renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;yaw+=(e.clientX-prevX)*.008;pitch=Math.max(-.35,Math.min(.75,pitch+(e.clientY-prevY)*.006));prevX=e.clientX;prevY=e.clientY});
+ renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();dist=Math.min(30,Math.max(2.8,dist+e.deltaY*.008))},{passive:false});
+ window.addEventListener('resize',()=>{camera.aspect=container.clientWidth/Math.max(1,container.clientHeight);camera.updateProjectionMatrix();renderer.setSize(container.clientWidth,Math.max(1,container.clientHeight))});
+ load('wardrobe');
+ const clock=new T.Clock();function draw(){requestAnimationFrame(draw);const t=clock.getElapsedTime();
+  if(model){const open=(Math.sin(t*.9)+1)*.49;
+   if(name==='wardrobe'){model.leftDoorPivot.rotation.y=open*1.45;model.rightDoorPivot.rotation.y=-open*1.45;}
+   if(name==='drawer')model.drawerMesh.position.z=.04+open*.65;
+   if(name==='door')model.pivot.rotation.y=-open*1.4;
+   if(name==='gear')model.group.rotation.z=t*.3;
+  }
+  camera.position.set(Math.sin(yaw)*Math.cos(pitch)*dist, Math.sin(pitch)*dist,Math.cos(yaw)*Math.cos(pitch)*dist);camera.lookAt(0,0,0);renderer.render(scene,camera);
+ }draw();
+})();
+</script></body></html>
