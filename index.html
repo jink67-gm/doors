@@ -844,11 +844,9 @@
 
     function playSfx(type, customVol = 1.0) {
       if (isAudioMuted) return;
-      if (type === 'step') {
-        playToneNote(80 + Math.random() * 25, 0.06, 'triangle', 0.05 * customVol, 0, 35);
-      } else if (type === 'crouchStep') {
-        playToneNote(60 + Math.random() * 15, 0.04, 'sine', 0.02 * customVol, 0, 30);
-      } else if (type === 'key') {
+      // V5: 발소리는 합성음을 쓰지 않음 (MathDoorsAudio.playFootstep만 사용 → 중복 재생 방지)
+      if (type === 'step' || type === 'crouchStep') return;
+      if (type === 'key') {
         playToneNote(660, 0.05, 'sine', 0.07);
       } else if (type === 'itemPickup') {
         playToneNote(587.33, 0.09, 'triangle', 0.12);
@@ -976,7 +974,7 @@
     }
     isAudioMuted=!!window.MathDoorsAudio?.settings?.muted;
     // 동작 이후 오디오가 시작되도록 첫 사용자 입력에서 브라우저 잠금을 해제.
-    document.addEventListener('pointerdown',()=>window.MathDoorsAudio?.unlock(),{once:true});
+    // 첫 클릭·터치·키 입력 잠금 해제는 audio-manager.js가 처리 (자동재생 차단 회피)
 
     // =========================================================================
     // V5 수학 문제은행 연결 (assets/js/math-bank-v5.js) + 쌓기나무 3×3 미리보기
@@ -1221,6 +1219,31 @@
       c.width = 512;
       c.height = 512;
       const ctx = c.getContext('2d');
+      if (theme === 'stone') {
+        // 돌 타일 바닥 (중앙 홀·시크 복도) — 발소리 'stone'과 일치
+        ctx.fillStyle = '#3a3a40'; ctx.fillRect(0, 0, 512, 512);
+        for (let y = 0; y < 512; y += 128) for (let x = 0; x < 512; x += 128) {
+          const off = (y / 128) % 2 ? 64 : 0, v = 50 + ((x * 7 + y * 13) % 23);
+          ctx.fillStyle = `rgb(${v},${v},${v + 6})`; ctx.fillRect((x + off) % 512, y, 124, 124);
+          if ((x + off) % 512 > 384) ctx.fillRect(0, y, ((x + off) % 512) - 388, 124);
+        }
+        ctx.strokeStyle = '#1c1c22'; ctx.lineWidth = 4;
+        for (let y = 0; y <= 512; y += 128) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke(); }
+        const tex = new THREE.CanvasTexture(c); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; return tex;
+      }
+      if (theme === 'metal') {
+        // 철판 바닥 (화물 창고) — 발소리 'metal'과 일치
+        ctx.fillStyle = '#4a4f57'; ctx.fillRect(0, 0, 512, 512);
+        ctx.fillStyle = '#5d636c';
+        for (let y = 8; y < 512; y += 32) for (let x = (y / 32) % 2 ? 24 : 8; x < 512; x += 32) {
+          ctx.save(); ctx.translate(x, y); ctx.rotate(((x + y) / 32) % 2 ? 0.6 : -0.6); ctx.fillRect(-9, -2.5, 18, 5); ctx.restore();
+        }
+        ctx.strokeStyle = '#2b2f35'; ctx.lineWidth = 5;
+        for (let v = 0; v <= 512; v += 256) { ctx.beginPath(); ctx.moveTo(v, 0); ctx.lineTo(v, 512); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, v); ctx.lineTo(512, v); ctx.stroke(); }
+        ctx.fillStyle = '#7b818a';
+        for (let v = 12; v < 512; v += 244) for (let u = 12; u < 512; u += 244) { ctx.beginPath(); ctx.arc(u, v, 4, 0, Math.PI * 2); ctx.fill(); }
+        const tex = new THREE.CanvasTexture(c); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; return tex;
+      }
       ctx.fillStyle = '#22140c';
       ctx.fillRect(0, 0, 512, 512);
 
@@ -1578,6 +1601,11 @@
       }
       return geo;
     }
+    const FLOOR_MATS = {};
+    function floorMat(kind) {
+      if (!FLOOR_MATS[kind]) FLOOR_MATS[kind] = new THREE.MeshStandardMaterial({ map: createFloorTexture(kind), roughness: kind === 'metal' ? 0.55 : 0.85, metalness: kind === 'metal' ? 0.45 : 0 });
+      return FLOOR_MATS[kind];
+    }
     function themeMats(theme) {
       if (THEME_MATS[theme]) return THEME_MATS[theme];
       const wallTex = createWallTexture(theme);
@@ -1717,7 +1745,8 @@
       const floorPiece = (d0, d1) => {
         const len = d1 - d0;
         if (len <= 0.01) return;
-        const f = new THREE.Mesh(planeGeo(W, len, Math.max(1, len / 6)), mats.floor);
+        const fk = floorKindOf(lay.arch);
+        const f = new THREE.Mesh(planeGeo(W, len, Math.max(1, len / 6)), fk === 'hotel' ? mats.floor : floorMat(fk));
         f.rotation.x = -Math.PI / 2;
         at(f, 0, 0, d0 + len / 2);
       };
@@ -2234,8 +2263,7 @@
           return;
         }
       }
-      player.isCrouching = !player.isCrouching;
-      playSfx('crouchStep');
+      player.isCrouching = !player.isCrouching;   // 웅크리기 전환 자체에는 발소리를 내지 않음
       updateHUD();
     }
 
@@ -2271,7 +2299,47 @@
     function setModalFlag(name, open) {
       uiOpen[name] = open;
       resetAllInput();
+      if (typeof stopFootstepLoop === 'function') stopFootstepLoop();
       document.body.classList.toggle('modal-open', anyBlockingModalOpen());
+    }
+
+    // ---------------------------------------------------------------- 발소리 (표면별 음원, 움직일 때만)
+    // 바닥 재질: 객실류 = 가운데 붉은 카펫 띠(폭의 58%)는 carpet, 바깥은 wood / 중앙 홀·시크 복도 = stone / 화물 창고 = metal
+    const FLOOR_KIND = { grandHall: 'stone', seek: 'stone', storage: 'metal' };
+    function floorKindOf(arch) { return FLOOR_KIND[arch] || 'hotel'; }
+    function surfaceAt(room, lx, ld) {
+      const lay = room.layout;
+      if (lay.creaks && lay.creaks.some(cr => Math.abs(lx - cr.x) < cr.hw && Math.abs(ld - cr.d) < cr.hd)) return 'wood';
+      if (lay.chasm && ld > lay.chasm.d0 - 0.15 && ld < lay.chasm.d1 + 0.15) return 'wood';      // 나무 다리 상판
+      if (ld > lay.L + 0.05) return 'wood';                                                       // 문턱
+      const k = floorKindOf(room.roomArch);
+      if (k !== 'hotel') return k;
+      if (lay.dupeDoors && ld > lay.frontD - 0.1) return 'wood';
+      return Math.abs(lx) < lay.W * 0.289 ? 'carpet' : 'wood';
+    }
+    const STEP_INTERVAL = { walk: 0.46, crouch: 0.72, run: 0.33 };
+    const foot = { t: 0, active: false, lastSurface: '', lastMode: '' };
+    function updateFootsteps(room, res, realSpeed, dt) {
+      const crouch = player.isCrouching;
+      const fleeing = seekState.active || (figureState.active && figureState.mode === 'chase') || rushState.active || ambushState.active;
+      const mode = crouch ? 'crouch' : (fleeing && realSpeed > 4.0 ? 'run' : 'walk');
+      const nominal = crouch ? 2.9 : 5.2;
+      // 조이스틱을 덜 기울이거나 느려지면 간격이 길어진다
+      const interval = STEP_INTERVAL[mode] * Math.min(1.8, Math.max(1, nominal / Math.max(realSpeed, 0.5)));
+      if (!foot.active) { foot.active = true; foot.t = interval - 0.12; }   // 걷기 시작 0.12초 뒤 첫 발
+      foot.t += dt;
+      if (foot.t < interval) return;
+      foot.t = 0;
+      const surface = surfaceAt(room, res.x, res.d);
+      const onCreak = room.layout.creaks && room.layout.creaks.some(cr => Math.abs(res.x - cr.x) < cr.hw && Math.abs(res.d - cr.d) < cr.hd);
+      if (onCreak) { playSfx('doorOpen', 0.35); player.creakTimer = 0.6; showSoundCue('🪵', '마룻바닥 삐걱'); }
+      foot.lastSurface = surface; foot.lastMode = mode;
+      if (window.MathDoorsAudio && !isAudioMuted) window.MathDoorsAudio.playFootstep(surface, mode, Math.min(1, 0.65 + 0.35 * realSpeed / nominal));
+    }
+    function stopFootstepLoop() {
+      if (!foot.active) return;
+      foot.active = false;
+      if (window.MathDoorsAudio) window.MathDoorsAudio.stopFootsteps();
     }
 
     let lowBeamHintAt = 0;
@@ -2481,16 +2549,12 @@
         player.lastSpeed = realSpeed;
 
         if (walking && moved > 0.002) {
-          const prevCycle = player.walkCycle;
           player.walkCycle += dt * (player.isCrouching ? 6.0 : 9.5);
-          if (Math.floor(player.walkCycle) > Math.floor(prevCycle)) {
-            const onCreak = curRoom.layout.creaks && curRoom.layout.creaks.some(cr => Math.abs(res.x - cr.x) < cr.hw && Math.abs(res.d - cr.d) < cr.hd);
-            if (onCreak) { playSfx('doorOpen', 0.35); player.creakTimer = 0.6; showSoundCue('🪵', '마룻바닥 삐걱'); }
-            playSfx(player.isCrouching ? 'crouchStep' : 'step');
-          }
           player.y = baseEyeHeight + Math.sin(player.walkCycle * 2) * (player.isCrouching ? 0.025 : 0.055);
+          updateFootsteps(curRoom, res, realSpeed, dt);
         } else {
           player.y += (baseEyeHeight - player.y) * Math.min(1, dt * 10);
+          stopFootstepLoop();
         }
         // 소음(피규어 감지용): 걷기 7.5m, 웅크려 걷기 2.2m, 삐걱 마루 9m, 정지 0
         if (player.creakTimer > 0) player.creakTimer -= dt;
@@ -3695,6 +3759,7 @@
 
       activeClosetObj = cObj;
       activeClosetObj.targetOpen = 1.0;
+      stopFootstepLoop();
       playSfx('closetOpen');
 
       if (!rushState.warning && !rushState.active && !ambushState.warning && !ambushState.active && !figureState.active && !jackState.triggeredInRoom && Math.random() < 0.12) {
