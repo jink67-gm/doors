@@ -85,7 +85,7 @@ async def figure_test():
     p, b, ctx, pg = await launch()
     g = Game(pg, lambda m: print(m, flush=True))
     # find a seed whose door 5 is a library (10-door mode: always) — play to it
-    await g.start(doors=10, diff='normal', units=(4, 5), seed=31337)
+    await g.start(doors=10, diff='easy', units=(4, 5), seed=31337)   # V6: 시즌1 호텔 맵 기준 시나리오
     while (await g.state())['door'] < 5:
         if not await play_room(g, g.log): break
     st = await g.state()

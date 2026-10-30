@@ -19,11 +19,24 @@ async def main(doors=10, seed=4242, units=(1,2,3,4,5,6), diff='easy', wrong_firs
     while True:
         st = await g.state()
         if not st['playing']: break
+        if st['room'] and st['room']['arch'] == 'escape':
+            # V6 마지막 탈출 통로: 무너지는 천장을 피해 끝까지 달린다
+            log(f"ESCAPE corridor (L={st['room']['L']}) hearts={st['hearts']}")
+            for _ in range(6):
+                r = await g.walk_to(0, st['room']['L'] - 1.0, tol=1.2, timeout=40, crouch=False)
+                if not (await g.state())['playing']: break
+            for _ in range(160):
+                if await g.ev("!document.getElementById('result-screen').classList.contains('hidden')"): break
+                await pg.wait_for_timeout(100)
+            break
         ok = await play_room(g, log, wrong_first=wrong_first)
         n += 1
         if not ok:
             log('  !! room not cleared'); break
         if maxrooms and n >= maxrooms: break
+    for _ in range(200):   # V6: 탈출 직후 흰 화면 연출 → 결과 화면이 뜰 때까지 기다린다
+        if await g.ev("!document.getElementById('result-screen').classList.contains('hidden')"): break
+        await pg.wait_for_timeout(100)
     res = await g.ev("({title: document.getElementById('result-title').innerText, visible: !document.getElementById('result-screen').classList.contains('hidden')})")
     st = await g.state()
     log('HITS ' + json.dumps(await g.ev('window.__hits'), ensure_ascii=False))

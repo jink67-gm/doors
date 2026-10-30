@@ -194,7 +194,15 @@
    let itemMesh=null;
    if(lootType!=='none'){
      itemMesh=new T.Group();
-     if(lootType==='key'){
+     if(lootType==='key' && SEASON_ITEM.v===2){
+       // 퓨즈: 유리관 + 구리 마개 + 안쪽 주황 필라멘트
+       const glass=cyl(itemMesh,.05,.05,.2,0,.04,0,MAT.glass,12);glass.rotation.z=Math.PI/2;
+       for(const x of [-.12,.12]){const cap=cyl(itemMesh,.056,.056,.05,x,.04,0,MAT.gold,12);cap.rotation.z=Math.PI/2;}
+     }else if(lootType==='key' && SEASON_ITEM.v===3){
+       // 룬 조각: 빛나는 청록 수정
+       const rune=new T.Mesh(new T.OctahedronGeometry(.1),new T.MeshStandardMaterial({color:0x0e5560,emissive:0x2fe6ff,emissiveIntensity:1.2,roughness:.3}));
+       rune.scale.y=1.5;rune.position.y=.08;itemMesh.add(rune);
+     }else if(lootType==='key'){
        const ring=torus(itemMesh,.095,.021,-.12,.02,0,MAT.gold);ring.rotation.x=Math.PI/2;
        const stem=cube(itemMesh,.29,.035,.04,.06,.02,0,MAT.gold);
        cube(itemMesh,.045,.11,.04,.20,.02,.025,MAT.gold);
@@ -437,7 +445,8 @@
    torus(g,.62,.035,0,h+2.85,0,BR).rotation.x=Math.PI/2;
    return g;
  }
- window.MathDoorsProps={MAT,createMonolith,createPedestal,createWardrobe,createDrawer,createTerminal,createBridge,
+ const SEASON_ITEM={v:1};
+ window.MathDoorsProps={SEASON_ITEM,MAT,createMonolith,createPedestal,createWardrobe,createDrawer,createTerminal,createBridge,
    createGearLock,decorateDoorLeaf,trimDoorFrame,createBookshelf,createCrates,decorateRoom,
    makeStandingLamp,makeSideTable,makeClock,makeWallSconce,cube,round,cyl,torus,roundedBox,bevelFor,detailTex};
 })();

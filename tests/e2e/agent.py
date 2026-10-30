@@ -125,7 +125,7 @@ async def play_room(g, log, wrong_first=False):
             await walk_safe(g, dr['x'], dr['d'], log, tol=0.6, crouch=(True if room['arch']=='library' else 'auto'))
             await g.key('KeyE'); await g.pg.wait_for_timeout(350); await g.key('KeyE'); await g.pg.wait_for_timeout(350)
             st = await g.state()
-            if st['keys'] > 0: log(f'    key found in drawer {i}'); break
+            if st['keys'] >= room.get('keysNeeded', 1): log(f'    items found ({st["keys"]}/{room.get("keysNeeded", 1)}) by drawer {i}'); break
     if t['terminal']:
         ok = await walk_safe(g, t['terminal']['x'], t['terminal']['d'], log, tol=0.6, crouch=(True if room['arch']=='library' else 'auto'))
         for attempt in range(5):

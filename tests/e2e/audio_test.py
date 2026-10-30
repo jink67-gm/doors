@@ -32,6 +32,7 @@ async def main():
     failed_req = []
     pg.on('requestfailed', lambda r: failed_req.append(r.url))
     await pg.route('**/fonts.googleapis.com/**', lambda r: r.abort())  # 샌드박스는 외부 글꼴 접속 불가 → 의도적으로 차단
+    await pg.add_init_script('window.__noPointerLock = true;')  # 헤드리스 포인터 잠금은 화면 합성을 크게 느리게 함 (마우스 둘러보기는 mouselook_test.py)
     await pg.goto(BASE)
     await pg.wait_for_function("window.MathDoorsAudio && typeof activeRooms !== 'undefined'", timeout=20000)
     await pg.wait_for_timeout(1500)
@@ -43,7 +44,7 @@ async def main():
     await pg.evaluate('window.__dtCap = 0.34')
     await g.ev(HOOK)
     # 게임 시작 클릭 (실제 클릭)
-    await g.ev("() => { window.__forceSeed = 4242; selectStageCount(10); }")
+    await g.ev("() => { window.__forceSeed = 4242; selectStageCount(10); selectDifficulty('easy'); }")
     await pg.click('text=새 게임 시작')
     await pg.wait_for_timeout(2500)
     st = await g.ev('MathDoorsAudio.status()')

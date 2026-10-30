@@ -69,6 +69,9 @@ function knockbackTest(lay) {
 
 const t0 = Date.now();
 const stats = {};
+const seasonCounts = {};
+for (const season of [1, 2, 3]) {
+C.setSeason(season);
 for (const Nd of [10, 20, 30]) {
   for (let s = 0; s < N; s++) {
     const seed = (Nd * 100003 + s * 7919 + 17) >>> 0;
@@ -82,7 +85,7 @@ for (const Nd of [10, 20, 30]) {
       const device = r.puzzle === 'bridge' ? 'bridge' : (prob && ['gear', 'monolith', 'voxel', 'sorter'].includes(prob.device) ? prob.device : null);
       const lay = C.generateRoom(seed, r, { kind: r.puzzle, device });
       rooms++;
-      const k = Nd + ':' + r.arch;
+      const k = 'S' + season + ':' + Nd + ':' + r.arch;
       stats[k] = (stats[k] || 0) + 1;
       if (lay.attempt === 99) { fallbacks++; fail(`fallback layout used: ${Nd} seed ${seed} door ${r.door} ${r.arch} :: ${(lay.failedAttempts || []).slice(0, 2).join(' | ')}`); }
       else if (lay.attempt > 0) regenerated++;
@@ -99,13 +102,19 @@ for (const Nd of [10, 20, 30]) {
         if (lay.closets.length || lay.drawers.length) fail('bridge room furniture');
       }
       if (r.arch === 'keySearch' && (!lay.requiresKey || lay.keyDrawer < 0)) fail('key room without key');
-      if (r.arch !== 'keySearch' && lay.drawers.some(d => d.loot === 'key')) fail('key outside key room');
+      if (r.arch !== 'keySearch' && !(season > 1 && lay.maze) && lay.drawers.some(d => d.loot === 'key')) fail('key outside key room');
+      if (lay.requiresKey && lay.drawers.filter(d => d.loot === 'key').length !== (lay.keysNeeded || 1)) fail(`S${season} item count mismatch ${r.arch}`);
+      if (season > 1 && r.arch === 'keySearch' && lay.keysNeeded !== season) fail(`S${season} key room needs ${lay.keysNeeded} items`);
+      if (lay.requiresKey) seasonCounts['S' + season + ' items/room ' + lay.keysNeeded] = (seasonCounts['S' + season + ' items/room ' + lay.keysNeeded] || 0) + 1;
       if (prob && !units.includes(prob.unit)) fail('problem from unselected unit');
       knockbackTest(lay);
       cx += lay.exitX;
     }
   }
 }
+}
+C.setSeason(1);
+console.log('season item rooms:', JSON.stringify(seasonCounts));
 
 // Negative tests: the validator must catch deliberately broken rooms
 (function negativeTests() {

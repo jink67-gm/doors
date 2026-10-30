@@ -166,6 +166,9 @@ async def launch(viewport=(480, 300), mobile=False, dtcap=0.34):
     import os
     if os.environ.get('MD_GFX', 'lite') == 'lite' and viewport[0] < 900:
         await pg.add_init_script("try { if (!localStorage.getItem('mathDoorsGfx')) localStorage.setItem('mathDoorsGfx', 'lite'); } catch (e) {}")
+    # 헤드리스 크롬에서 포인터 잠금(마우스 둘러보기)을 켜면 화면 합성이 매우 느려진다 → 기본 끔 (MD_LOCK=1이면 켬)
+    if os.environ.get('MD_LOCK') != '1':
+        await pg.add_init_script('window.__noPointerLock = true;')
     await pg.goto(BASE)
     await pg.wait_for_function("window.MathDoorsDebug && typeof activeRooms !== 'undefined' && isPlaying === false", timeout=20000)
     await pg.evaluate(f'window.__dtCap = {dtcap}')

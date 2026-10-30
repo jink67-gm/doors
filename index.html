@@ -139,6 +139,14 @@
   </div>
 
   <!-- 화면 중앙 조준점 (Crosshair & 스크리치 손전등 반응 게이지) -->
+  <div id="season-intro" class="fixed inset-0 z-40 pointer-events-none hidden flex-col items-center justify-center text-center bg-black/80 transition-opacity duration-1000" style="opacity:0">
+    <div id="season-intro-tag" class="title-font text-amber-400 text-lg sm:text-2xl tracking-widest mb-3"></div>
+    <div id="season-intro-l1" class="text-white text-xl sm:text-3xl font-black mb-3 px-6"></div>
+    <div id="season-intro-l2" class="text-slate-300 text-sm sm:text-lg px-6"></div>
+  </div>
+  <div id="escape-hud" class="fixed top-16 left-1/2 -translate-x-1/2 z-30 pointer-events-none hidden px-4 py-2 rounded-xl bg-red-950/85 border-2 border-red-500 text-red-100 font-black text-sm sm:text-lg animate-pulse"></div>
+  <div id="whiteout" class="fixed inset-0 z-[45] pointer-events-none bg-white transition-opacity duration-[1600ms]" style="opacity:0"></div>
+  <div id="mouselook-hint" class="fixed top-[58%] left-1/2 -translate-x-1/2 z-20 pointer-events-none hidden px-3 py-1.5 rounded-lg bg-slate-950/80 border border-amber-400/50 text-amber-200 text-xs font-bold">🖱️ 화면을 클릭하면 마우스로 둘러볼 수 있어요 · ESC = 마우스 풀기</div>
   <div id="crosshair" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none hidden flex-col items-center gap-1">
     <div id="crosshair-dot" class="w-3 h-3 rounded-full bg-white/85 border border-black shadow-[0_0_8px_#fff] transition-transform duration-150"></div>
     <div id="gaze-bar-wrap" class="hidden w-24 h-2.5 bg-black/85 rounded-full overflow-hidden border border-amber-300 shadow-lg">
@@ -278,20 +286,20 @@
           <div>
             <div class="flex items-center justify-between mb-1.5">
               <label class="text-amber-400 font-extrabold text-xs sm:text-sm">⚡ 2. 탐험 및 괴물 난이도</label>
-              <span class="text-[11px] text-slate-400">경고 시간·속도 조절</span>
+              <span class="text-[11px] text-slate-400">난이도마다 다른 시즌·맵·괴물</span>
             </div>
             <div class="grid grid-cols-3 gap-1.5">
               <button onclick="selectDifficulty('easy')" id="diff-btn-easy" class="diff-opt py-2 px-2 rounded-xl border-2 border-slate-700 bg-slate-900/70 text-slate-300 font-bold text-xs transition flex flex-col items-center">
                 <span class="text-sm font-black text-emerald-300">쉬움</span>
-                <span class="text-[10px] text-slate-400">여유로운 경고</span>
+                <span class="text-[10px] text-slate-400">시즌 1 · 호텔</span>
               </button>
               <button onclick="selectDifficulty('normal')" id="diff-btn-normal" class="diff-opt py-2 px-2 rounded-xl border-2 border-amber-400 bg-amber-500/20 text-white font-bold text-xs transition flex flex-col items-center">
                 <span class="text-sm font-black text-amber-300">보통</span>
-                <span class="text-[10px] text-slate-300">표준 밸런스</span>
+                <span class="text-[10px] text-slate-300">시즌 2 · 지하 하수도</span>
               </button>
               <button onclick="selectDifficulty('challenge')" id="diff-btn-challenge" class="diff-opt py-2 px-2 rounded-xl border-2 border-slate-700 bg-slate-900/70 text-slate-300 font-bold text-xs transition flex flex-col items-center">
                 <span class="text-sm font-black text-rose-400">도전</span>
-                <span class="text-[10px] text-slate-400">빠른 추격</span>
+                <span class="text-[10px] text-slate-400">최종 · 무너지는 성</span>
               </button>
             </div>
           </div>
@@ -543,7 +551,9 @@
       <input id="audio-bgm-volume" type="range" min="0" max="100" value="38" oninput="MathDoorsAudio.setVolume('bgm',this.value/100)" class="w-full accent-amber-400 mb-5" />
       <label for="audio-sfx-volume" class="flex justify-between mb-2"><b>👻 효과음 · 괴물 소리</b><span id="audio-sfx-value">75%</span></label>
       <input id="audio-sfx-volume" type="range" min="0" max="100" value="75" oninput="MathDoorsAudio.setVolume('sfx',this.value/100)" class="w-full accent-amber-400 mb-5" />
-      <p class="text-xs text-slate-400">설정은 이 브라우저에 저장됩니다. 소리는 호텔 탐험 시작 버튼을 누른 뒤 재생됩니다.</p>
+      <label for="mouse-sens" class="flex justify-between mb-2"><b>🖱️ 마우스 둘러보기 감도</b><span id="mouse-sens-value">100%</span></label>
+      <input id="mouse-sens" type="range" min="30" max="250" value="100" oninput="setMouseSens(this.value/100)" class="w-full accent-amber-400 mb-5" />
+      <p class="text-xs text-slate-400">설정은 이 브라우저에 저장됩니다. 소리는 탐험 시작 버튼을 누른 뒤 재생됩니다. 게임 중 ESC를 누르면 마우스가 풀리고, 화면을 클릭하면 다시 마우스로 둘러봅니다.</p>
     </div>
   </div>
 
@@ -1175,6 +1185,65 @@
     // ===== V5 진행 상태 =====
     let gameSeed = 0;
     let stagePlan = null;
+
+    // =========================================================================
+    // V6 시즌 시스템: 난이도 = 시즌 (쉬움 1 호텔 / 보통 2 지하 하수도·보일러실 / 도전 3 무너지는 성)
+    // =========================================================================
+    let SEASON = 1;
+    const SEASONS = {
+      1: { tag: '시즌 1', place: '그랜드 매스 호텔', fog: 0x050408, light: 0xffd27d, sky: 0xe8c7a0, ground: 0x2b1a3a, dust: 0xffe2b8,
+           item: { icon: '🗝️', name: '황금 열쇠', door: '열쇠로 자물쇠 열기', where: '서랍에서 열쇠를' }, win: 'HOTEL ESCAPED!',
+           intro: ['그랜드 매스 호텔', '문마다 걸린 수학 장치를 풀고 호텔을 빠져나가자.'],
+           teaser: '…그런데 발밑 어딘가에서 물 흐르는 소리가 들린다.' },
+      2: { tag: '시즌 2', place: '지하 하수도 · 보일러실', fog: 0x030a08, light: 0xbfe8d4, sky: 0x9cc9b4, ground: 0x13231b, dust: 0xb8f0d0,
+           item: { icon: '🔌', name: '퓨즈', door: '퓨즈를 끼워 전기 연결하기', where: '서랍에서 퓨즈를' }, win: 'SEWER ESCAPED!',
+           intro: ['호텔 문을 열고 나온 순간, 바닥이 무너졌다…', '여기는 호텔 아래 지하 하수도. 다시 탈출해야 한다.'],
+           teaser: '…맨홀 너머로 오래된 성의 종소리가 울린다.' },
+      3: { tag: '최종 시즌', place: '무너지는 성', fog: 0x0a0505, light: 0xff9550, sky: 0xd9a27a, ground: 0x2a0d0d, dust: 0xffb070,
+           item: { icon: '🔷', name: '룬 조각', door: '룬 조각을 끼워 봉인 풀기', where: '서랍에서 룬 조각을' }, win: 'CASTLE ESCAPED!',
+           intro: ['하수도 사다리의 끝은… 무너져 가는 성의 지하였다.', '마지막 탈출. 성이 무너지기 전에 빛이 있는 곳으로.'],
+           teaser: '' }
+    };
+    function showSeasonIntro() {
+      const c = seasonCfg(), el = document.getElementById('season-intro'); if (!el) return;
+      document.getElementById('season-intro-tag').innerText = c.tag + ' · ' + c.place;
+      document.getElementById('season-intro-l1').innerText = c.intro[0];
+      document.getElementById('season-intro-l2').innerText = c.intro[1];
+      el.classList.remove('hidden'); el.classList.add('flex');
+      requestAnimationFrame(() => { el.style.opacity = '1'; });
+      setTimeout(() => { el.style.opacity = '0'; }, 3600);
+      setTimeout(() => { el.classList.add('hidden'); el.classList.remove('flex'); }, 4700);
+    }
+    function seasonOf(diff) { return diff === 'easy' ? 1 : (diff === 'challenge' ? 3 : 2); }
+    function seasonCfg() { return SEASONS[SEASON] || SEASONS[1]; }
+    function seasonLight() { return seasonCfg().light; }
+    const SEASON_LABELS = {
+      2: { guest: '🚰 배수 관리실', storage: '📦 자재 창고', grandHall: '⚙️ 거대 펌프 홀', lCorridor: '↪️ 꺾인 배수로', uCorridor: '🔀 굽은 하수관', shortcutHall: '🕳️ 배관 지름길',
+           secretWing: '🕯️ 숨겨진 점검실', darkRoom: '🌑 정전된 펌프실', dupe: '🚪 갈림 수문', bridge: '🌉 끊어진 배수로', keySearch: '🔌 퓨즈 찾기', seek: '👁️ 배수 터널 추격',
+           library: '🔥 보일러실', zigzag: '〰️ 지그재그 하수관', slalom: '🧱 엇갈린 수문 홀', maze: '🧭 하수도 미로' },
+      3: { guest: '🏰 성 입구 홀', storage: '🛢️ 무기고', grandHall: '👑 옥좌의 방', lCorridor: '↪️ 꺾인 성벽 길', uCorridor: '🔀 굽은 회랑', shortcutHall: '🕳️ 무너진 벽 틈',
+           secretWing: '🕯️ 비밀 예배실', darkRoom: '🌑 지하 감옥', dupe: '🚪 거짓 성문', bridge: '🌉 무너진 도개교', keySearch: '🔷 룬 조각 찾기', seek: '👁️ 성벽 회랑 추격',
+           library: '📚 무너진 서고', zigzag: '〰️ 지그재그 계단 회랑', slalom: '🧱 엇갈린 기둥 홀', maze: '🧭 무너진 성 미로' }
+    };
+    function seasonLabel(arch) { if (arch === 'escape') return SEASON === 1 ? '🌅 탈출구' : (SEASON === 2 ? '🪜 맨홀 출구' : '🌄 무너지는 성문'); return SEASON_LABELS[SEASON] && SEASON_LABELS[SEASON][arch]; }
+    function itemCfg() { return seasonCfg().item; }
+    // 시즌 분위기: 안개·배경·반구광·먼지 색, 공용 가구 재질 색 (방을 만들기 전에 호출)
+    const PROP_BASE = {};
+    function applySeasonLook() {
+      const c = seasonCfg();
+      if (scene) { scene.background = new THREE.Color(c.fog); scene.fog.color.setHex(c.fog); }
+      if (hemiLight) { hemiLight.color.setHex(c.sky); hemiLight.groundColor.setHex(c.ground); }
+      if (dustPoints) dustPoints.material.color.setHex(c.dust);
+      if (window.MathDoorsProps) {
+        const M = MathDoorsProps.MAT;
+        const tint = { 1: {}, 2: { wood: 0x4d5a5c, dark: 0x262c2e, edge: 0x6b7476, panel: 0x3d484a, textile: 0x2f4a3a, gold: 0x9a6a3a }, 3: { wood: 0x3d2b1f, dark: 0x1c1410, edge: 0x5a4636, panel: 0x33261c, textile: 0x4a1418, gold: 0x6e6e72 } }[SEASON];
+        Object.keys(M).forEach(k => { const m = M[k]; if (!m || !m.color) return; if (PROP_BASE[k] === undefined) PROP_BASE[k] = m.color.getHex(); m.color.setHex(tint[k] !== undefined ? tint[k] : PROP_BASE[k]); });
+        if (SEASON === 2 && M.metal) { M.wood.metalness = 0.45; M.wood.roughness = 0.55; M.edge.metalness = 0.5; } else { M.wood.metalness = 0; M.wood.roughness = 0.73; M.edge.metalness = 0; }
+      }
+      if (window.MathDoorsProps && MathDoorsProps.SEASON_ITEM) MathDoorsProps.SEASON_ITEM.v = SEASON;
+      applySeasonToMonsters();
+      const t = document.getElementById('season-tag'); if (t) t.innerText = c.tag + ' · ' + c.place;
+    }
     let deck = null;
     let logicalRooms = {};
     let lastLogicalDoor = 0;
@@ -1335,6 +1404,8 @@
       return tex;
     }
     function createWallTexture(theme = 'normal') {
+      if (SEASON === 2) return createSewerWallTexture(theme);
+      if (SEASON === 3) return createCastleWallTexture(theme);
       const S = 512, c = document.createElement('canvas'); c.width = c.height = S;
       const ctx = c.getContext('2d'), rnd = texRng(theme.length * 131 + 7);
       const base = theme === 'darkRoom' ? '#0f0c14' : (theme === 'library' ? '#2a1d17' : '#2a1f33');
@@ -1383,7 +1454,63 @@
       return finishTex(c);
     }
 
+    // 시즌 2: 콘크리트 블록 + 이끼·녹물 + 아래쪽 청록 페인트 띠 (보일러실 = 녹슨 철판)
+    function createSewerWallTexture(theme) {
+      const S = 512, c = document.createElement('canvas'); c.width = c.height = S;
+      const ctx = c.getContext('2d'), rnd = texRng(2002 + theme.length);
+      const boiler = theme === 'library', dark = theme === 'darkRoom';
+      ctx.fillStyle = boiler ? '#4a2c1c' : (dark ? '#1a201e' : '#5a625e'); ctx.fillRect(0, 0, S, S);
+      if (boiler) {
+        for (let y = 0; y < S; y += 128) for (let x = 0; x < S; x += 128) {
+          const v = rnd(); ctx.fillStyle = `rgb(${70 + v * 30},${40 + v * 16},${26 + v * 10})`; ctx.fillRect(x + 2, y + 2, 124, 124);
+          ctx.fillStyle = 'rgba(255,200,150,0.25)'; [[8, 8], [116, 8], [8, 116], [116, 116]].forEach(([a, b]) => { ctx.beginPath(); ctx.arc(x + a, y + b, 4, 0, Math.PI * 2); ctx.fill(); });
+        }
+      } else {
+        for (let y = 0; y < S; y += 64) for (let x = (y / 64) % 2 ? -64 : 0; x < S; x += 128) {
+          const v = rnd(); const b = dark ? 22 + v * 10 : 78 + v * 22;
+          ctx.fillStyle = `rgb(${b},${b + 6},${b + 3})`; ctx.fillRect(x + 3, y + 3, 122, 58);
+        }
+      }
+      for (let i = 0; i < 14; i++) { const x = rnd() * S, w = 4 + rnd() * 18, len = 80 + rnd() * 300;
+        const g = ctx.createLinearGradient(0, 0, 0, len); g.addColorStop(0, rnd() < 0.5 ? 'rgba(120,60,20,0.35)' : 'rgba(40,90,50,0.35)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g; ctx.fillRect(x, 0, w, len); }
+      for (let i = 0; i < 8; i++) { const x = rnd() * S, y = 300 + rnd() * 212, r = 30 + rnd() * 80; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(30,70,35,0.4)'); g.addColorStop(1, 'rgba(30,70,35,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+      if (!boiler) { ctx.fillStyle = dark ? 'rgba(10,40,36,0.7)' : 'rgba(20,80,72,0.75)'; ctx.fillRect(0, 340, S, 172); ctx.fillStyle = 'rgba(230,190,40,0.8)'; for (let x = -20; x < S; x += 40) { ctx.save(); ctx.translate(x, 334); ctx.transform(1, 0, 0.8, 1, 0, 0); ctx.fillRect(0, 0, 20, 8); ctx.restore(); } }
+      const top = ctx.createLinearGradient(0, 0, 0, 180); top.addColorStop(0, 'rgba(0,0,0,0.55)'); top.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = top; ctx.fillRect(0, 0, S, 180);
+      addNoise(ctx, S, S, 20, rnd);
+      return finishTex(c);
+    }
+    // 시즌 3: 큰 돌 블록 성벽 + 금·이끼 + 아래쪽 어두운 초석 (서고 = 따뜻한 돌)
+    function createCastleWallTexture(theme) {
+      const S = 512, c = document.createElement('canvas'); c.width = c.height = S;
+      const ctx = c.getContext('2d'), rnd = texRng(3003 + theme.length);
+      const dark = theme === 'darkRoom', warm = theme === 'library';
+      ctx.fillStyle = '#1a1614'; ctx.fillRect(0, 0, S, S);
+      for (let y = 0; y < S; y += 85) for (let x = ((y / 85) | 0) % 2 ? -64 : 0; x < S; x += 128) {
+        const v = rnd(); const b = dark ? 26 + v * 12 : 50 + v * 24;
+        ctx.fillStyle = warm ? `rgb(${b + 18},${b + 4},${b - 8})` : `rgb(${b + 4},${b},${b - 4})`;
+        ctx.fillRect(x + 3, y + 3, 122, 79);
+        ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(x + 3, y + 3, 122, 4);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x + 3, y + 76, 122, 6);
+      }
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.2;
+      for (let i = 0; i < 9; i++) { let x = rnd() * S, y = rnd() * S; ctx.beginPath(); ctx.moveTo(x, y); for (let k = 0; k < 8; k++) { x += (rnd() - 0.5) * 40; y += rnd() * 30; ctx.lineTo(x, y); } ctx.stroke(); }
+      for (let i = 0; i < 10; i++) { const x = rnd() * S, y = rnd() * S, r = 20 + rnd() * 60; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, rnd() < 0.5 ? 'rgba(40,60,30,0.35)' : 'rgba(10,6,4,0.4)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 380, S, 132);
+      const top = ctx.createLinearGradient(0, 0, 0, 200); top.addColorStop(0, 'rgba(0,0,0,0.6)'); top.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = top; ctx.fillRect(0, 0, S, 200);
+      addNoise(ctx, S, S, 22, rnd);
+      return finishTex(c);
+    }
     function createCeilingTexture() {
+      if (SEASON > 1) {
+        const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+        const ctx = c.getContext('2d'), rnd = texRng(5000 + SEASON);
+        ctx.fillStyle = SEASON === 2 ? '#1b211f' : '#140f0c'; ctx.fillRect(0, 0, S, S);
+        if (SEASON === 2) { ctx.fillStyle = '#3a4440'; ctx.fillRect(40, 0, 18, S); ctx.fillRect(170, 0, 12, S); ctx.fillStyle = 'rgba(160,90,40,0.5)'; ctx.fillRect(40, 0, 18, 6); }
+        else { ctx.fillStyle = '#2a1d14'; ctx.fillRect(0, 0, S, 36); ctx.fillRect(0, 128, S, 36); ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(0, 32, S, 6); ctx.fillRect(0, 160, S, 6); }
+        addNoise(ctx, S, S, 18, rnd);
+        return finishTex(c);
+      }
       const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
       const ctx = c.getContext('2d'), rnd = texRng(4242);
       ctx.fillStyle = '#1a1620'; ctx.fillRect(0, 0, S, S);
@@ -1416,6 +1543,30 @@
         ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1;
         for (let i = 0; i < 6; i++) { let x = r2() * 512, y = r2() * 512; ctx.beginPath(); ctx.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (r2() - 0.5) * 40; y += (r2() - 0.5) * 40; ctx.lineTo(x, y); } ctx.stroke(); }
         addNoise(ctx, 512, 512, 22, r2);
+        return finishTex(c);
+      }
+      if (theme === 'sewer') {
+        // 젖은 콘크리트 + 가운데 배수 철망 (발소리: 가운데 = 금속, 나머지 = 돌)
+        const r4 = texRng(4404);
+        ctx.fillStyle = '#3c4441'; ctx.fillRect(0, 0, 512, 512);
+        for (let y = 0; y < 512; y += 128) for (let x = 0; x < 512; x += 128) { const v = r4(); ctx.fillStyle = `rgb(${54 + v * 18},${62 + v * 18},${58 + v * 16})`; ctx.fillRect(x + 2, y + 2, 124, 124); }
+        for (let i = 0; i < 16; i++) { const x = r4() * 512, y = r4() * 512, r = 20 + r4() * 70; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(10,25,20,0.45)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+        ctx.fillStyle = '#16191a'; ctx.fillRect(196, 0, 120, 512);
+        ctx.strokeStyle = '#5e6668'; ctx.lineWidth = 3;
+        for (let y = 0; y < 512; y += 14) { ctx.beginPath(); ctx.moveTo(196, y); ctx.lineTo(316, y); ctx.stroke(); }
+        ctx.fillStyle = '#4b5355'; ctx.fillRect(190, 0, 8, 512); ctx.fillRect(314, 0, 8, 512);
+        addNoise(ctx, 512, 512, 18, r4);
+        return finishTex(c);
+      }
+      if (theme === 'castle') {
+        // 판석 바닥 + 낡고 찢어진 붉은 카펫 (발소리: 카펫 / 돌)
+        const r5 = texRng(5505);
+        ctx.fillStyle = '#1c1816'; ctx.fillRect(0, 0, 512, 512);
+        for (let y = 0; y < 512; y += 96) for (let x = ((y / 96) | 0) % 2 ? -48 : 0; x < 512; x += 96) { const v = r5(); const b = 52 + v * 26; ctx.fillStyle = `rgb(${b + 4},${b},${b - 4})`; ctx.fillRect(x + 3, y + 3, 90, 90); }
+        ctx.fillStyle = '#360c10'; ctx.fillRect(150, 0, 212, 512);
+        ctx.fillStyle = 'rgba(160,120,50,0.5)'; ctx.fillRect(156, 0, 4, 512); ctx.fillRect(352, 0, 4, 512);
+        for (let i = 0; i < 6; i++) { const y = r5() * 512, h = 20 + r5() * 50, side = r5() < 0.5; ctx.fillStyle = '#1c1816'; ctx.beginPath(); ctx.moveTo(side ? 150 : 362, y); ctx.lineTo(side ? 150 + 20 + r5() * 30 : 362 - 20 - r5() * 30, y + h / 2); ctx.lineTo(side ? 150 : 362, y + h); ctx.fill(); }
+        addNoise(ctx, 512, 512, 20, r5);
         return finishTex(c);
       }
       if (theme === 'parquet') {
@@ -1545,7 +1696,7 @@
       if (requiresKey) {
         ctx.fillStyle = '#f59e0b';
         ctx.font = 'bold 26px sans-serif';
-        ctx.fillText('🗝️ 열쇠 필요', 128, 175);
+        ctx.fillText(`${itemCfg().icon} ${itemCfg().name}${requiresKey > 1 ? ' ×' + requiresKey : ''}`, 128, 175);
       }
 
       ctx.fillStyle = '#fbbf24';
@@ -1787,6 +1938,34 @@
       animateLoop();
     }
 
+    // V6 시즌별 괴물 외형: 시즌2 = 하수 오물(초록·청록 빛), 시즌3 = 불타는 잿빛(주황·붉은 빛) + 더 커짐
+    const MAT_BASE = new WeakMap();
+    const SEASON_MONSTER = {
+      2: { tint: [0.62, 0.95, 0.72], mix: 0.45, glow: { rush: 0x37ff9a, ambush: 0x2ce6c8, seek: 0x6cff6c, figure: 0x9aff4a, screech: 0x7dffb0, dupe: 0x4affc0, jack: 0x9affd0, hide: 0x5aff9a }, scale: 1.0 },
+      3: { tint: [1.0, 0.62, 0.5], mix: 0.5, glow: { rush: 0xff5a1f, ambush: 0xff2b55, seek: 0xff7a2a, figure: 0xff3b1f, screech: 0xffb02a, dupe: 0xff4a4a, jack: 0xff6a3a, hide: 0xff8a3a }, scale: 1.12 }
+    };
+    function tintMonster(obj, kind) {
+      if (!obj) return obj;
+      const cfg = SEASON_MONSTER[SEASON];
+      if (obj.userData.baseScale === undefined) obj.userData.baseScale = obj.scale.x;
+      if (obj.userData.baseGlow === undefined) obj.userData.baseGlow = obj.userData.glowColor;
+      obj.scale.setScalar(obj.userData.baseScale * (cfg ? cfg.scale : 1));
+      obj.userData.glowColor = cfg && cfg.glow[kind] !== undefined ? cfg.glow[kind] : obj.userData.baseGlow;
+      obj.traverse(o => {
+        if (!o.isMesh || !o.material) return;
+        (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+          if (!MAT_BASE.has(m)) MAT_BASE.set(m, { c: m.color ? m.color.clone() : null, e: m.emissive ? m.emissive.clone() : null });
+          const b = MAT_BASE.get(m);
+          if (b.c) { m.color.copy(b.c); if (cfg) { const t = cfg.tint; m.color.r += (b.c.r * t[0] - b.c.r) * cfg.mix * 2; m.color.g += (b.c.g * t[1] - b.c.g) * cfg.mix * 2; m.color.b += (b.c.b * t[2] - b.c.b) * cfg.mix * 2; } }
+          if (b.e) { m.emissive.copy(b.e); if (cfg && (b.e.r + b.e.g + b.e.b) > 0.05) { const gl = new THREE.Color(cfg.glow[kind] || 0xffffff); const k = Math.max(b.e.r, b.e.g, b.e.b); m.emissive.setRGB(gl.r * k, gl.g * k, gl.b * k); } }
+        });
+      });
+      return obj;
+    }
+    function applySeasonToMonsters() {
+      tintMonster(rushMonster3D, 'rush'); tintMonster(ambushMonster3D, 'ambush'); tintMonster(screechMonster3D, 'screech');
+      tintMonster(seekMonster3D, 'seek'); tintMonster(jackMonster3D, 'jack'); tintMonster(hideMonster3D, 'hide');
+    }
     function stripMonsterLights(obj) {
       const lights = [];
       obj.traverse(o => { if (o.isPointLight) lights.push(o); });
@@ -1821,6 +2000,7 @@
         else if (kind === 'sph') geo = new THREE.SphereGeometry(...args);
         else if (kind === 'circle') geo = new THREE.CircleGeometry(...args);
         else if (kind === 'cone') geo = new THREE.ConeGeometry(...args);
+        else if (kind === 'dodeca') geo = new THREE.DodecahedronGeometry(...args);
         GEO_CACHE.set(key, geo);
       }
       return geo;
@@ -1838,39 +2018,48 @@
       return geo;
     }
     const FLOOR_MATS = {};
-    let CEIL_TEX = null;
+    // 시즌 2·3은 방 종류와 상관없이 그 시즌 바닥 (창고만 철판)
+    function floorTexKind(kind) {
+      if (SEASON === 1) return kind;
+      if (kind === 'metal') return 'metal';
+      return SEASON === 2 ? 'sewer' : 'castle';
+    }
+    const CEIL_TEX = {};
     function floorMat(kind) {
+      kind = floorTexKind(kind);
       if (!FLOOR_MATS[kind]) { const t = createFloorTexture(kind); FLOOR_MATS[kind] = new THREE.MeshStandardMaterial({ map: t, bumpMap: t, bumpScale: 0.03, roughness: kind === 'metal' ? 0.5 : 0.72, metalness: kind === 'metal' ? 0.45 : 0 }); if (gfxQuality === 'lite') applyGraphicsQuality(); }
       return FLOOR_MATS[kind];
     }
     function themeMats(theme) {
-      if (THEME_MATS[theme]) return THEME_MATS[theme];
+      const tk = SEASON + ':' + theme;
+      if (THEME_MATS[tk]) return THEME_MATS[tk];
       const wallTex = createWallTexture(theme);
-      const floorTex = createFloorTexture(theme);
+      const floorTex = createFloorTexture(SEASON === 1 ? theme : (SEASON === 2 ? 'sewer' : 'castle'));
+      const TRIM = { 1: [0x77482b, 0x96723e, 0x392015, 0xcdbfe0], 2: [0x3f4a45, 0xa0663a, 0x2c3431, 0xc8d6cf], 3: [0x4a4440, 0x6a6a70, 0x2e2622, 0xd8cfc8] }[SEASON];
       const m = {
         wall: new THREE.MeshStandardMaterial({ map: wallTex, bumpMap: wallTex, bumpScale: 0.025, roughness: 0.82 }),
-        partition: new THREE.MeshStandardMaterial({ map: wallTex, bumpMap: wallTex, bumpScale: 0.025, color: 0xcdbfe0, roughness: 0.84 }),
+        partition: new THREE.MeshStandardMaterial({ map: wallTex, bumpMap: wallTex, bumpScale: 0.025, color: TRIM[3], roughness: 0.84 }),
         floor: new THREE.MeshStandardMaterial({ map: floorTex, bumpMap: floorTex, bumpScale: 0.03, roughness: 0.74 }),
-        ceil: new THREE.MeshStandardMaterial({ map: CEIL_TEX || (CEIL_TEX = createCeilingTexture()), roughness: 0.95 }),
+        ceil: new THREE.MeshStandardMaterial({ map: CEIL_TEX[SEASON] || (CEIL_TEX[SEASON] = createCeilingTexture()), roughness: 0.95 }),
         frame: new THREE.MeshStandardMaterial({ color: 0x26150b, roughness: 0.7 }),
         debris: new THREE.MeshStandardMaterial({ color: 0x27170e, roughness: 0.85 }),
         stone: new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 }),
         dark: new THREE.MeshBasicMaterial({ color: 0x020104 }),
         abyssWall: new THREE.MeshStandardMaterial({ color: 0x120c10, roughness: 1 }),
         creak: new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.9 }),
-        panelWood: new THREE.MeshStandardMaterial({ color: 0x392015, roughness: 0.79 }),
-        trimWood: new THREE.MeshStandardMaterial({ color: 0x77482b, roughness: 0.70 }),
-        gold: new THREE.MeshStandardMaterial({ color: 0x96723e, metalness: 0.35, roughness: 0.66 }),
+        panelWood: new THREE.MeshStandardMaterial({ color: TRIM[2], roughness: 0.79 }),
+        trimWood: new THREE.MeshStandardMaterial({ color: TRIM[0], roughness: SEASON === 2 ? 0.5 : 0.70, metalness: SEASON === 2 ? 0.4 : 0 }),
+        gold: new THREE.MeshStandardMaterial({ color: TRIM[1], metalness: SEASON === 1 ? 0.35 : 0.6, roughness: 0.6 }),
         lampGlow: new THREE.MeshBasicMaterial({ color: 0xffd38a }),
         lampDim: new THREE.MeshBasicMaterial({ color: 0x2a2018 }),
         eye: new THREE.MeshBasicMaterial({ color: 0xff1744 }),
         pupil: new THREE.MeshBasicMaterial({ color: 0xffffff }),
         voxel: new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.55, emissive: 0x3a1d00, emissiveIntensity: 0.4 }),
-        paint: [0x5b2333, 0x23395b, 0x2f4f3a, 0x5b4a23].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }))
+        paint: ({ 1: [0x5b2333, 0x23395b, 0x2f4f3a, 0x5b4a23], 2: [0x2f4a3f, 0x4a4a2a, 0x3a3f44, 0x5a3a22], 3: [0x4a0e12, 0x3a0a10, 0x40140c, 0x2c0a12] }[SEASON]).map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }))
       };
       wallTex.wrapS = THREE.RepeatWrapping;
       floorTex.wrapT = THREE.RepeatWrapping;
-      THEME_MATS[theme] = m;
+      THEME_MATS[tk] = m;
       if (gfxQuality === 'lite') applyGraphicsQuality();
       return m;
     }
@@ -1929,7 +2118,9 @@
         const centerX = prev ? prev.centerX + prev.layout.exitX : 0;
         const zStart = prev ? prev.zStart - prev.layout.L : 0;
         if (k > maxDoors) {
-          const lay = { W: 10, L: 12, frontD: 12, exitX: 0, hasEntrance: true, arch: 'escape', theme: 'normal', lightLevel: 1.8, rects: [], circles: [], closets: [], drawers: [], props: [], wallDecor: [], creaks: [] };
+          // V6: 마지막 탈출 통로 (길이 34 m, 무너진 잔해 사이를 지그재그로 달려 빠져나감)
+          const deb = (x, d) => ({ x, d, hw: 1.7, hd: 0.55, y0: 0, y1: 1.15, kind: 'debris', crouch: false });
+          const lay = { W: 9, L: 34, frontD: 34, exitX: 0, hasEntrance: true, arch: 'escape', theme: 'normal', lightLevel: 1.8, rects: [deb(-2.75, 8), deb(2.75, 14.5), deb(-2.75, 21), deb(2.75, 27.5)], circles: [], closets: [], drawers: [], props: [], wallDecor: [], creaks: [] };
           logicalRooms[k] = { plan: { door: k, arch: 'escape', label: '🌅 탈출구', events: {}, puzzle: 'none' }, layout: lay, problem: null, centerX, zStart };
         } else {
           const plan = stagePlan.rooms[k];
@@ -2110,6 +2301,21 @@
       }
 
       // ---- 벽 장식 (가구와 겹치지 않게 배치도에서 미리 자리 확인)
+      // V6 시즌 장식: 시즌2 = 벽을 따라 지나가는 배관, 시즌3 = 벽 밑 돌무더기
+      if (SEASON === 2 && lay.arch !== 'escape') {
+        for (const side of [-1, 1]) {
+          [[4.35, 0.13], [4.8, 0.09]].forEach(([y, r]) => { const pp = at(new THREE.Mesh(cachedGeo('cyl', r, r, L - 0.4, 10), mats.gold), side * (W / 2 - 0.32), y, L / 2); pp.rotation.x = Math.PI / 2; });
+        }
+      } else if (SEASON === 3 && lay.arch !== 'escape') {
+        const rr = Core.makeRng('rubble', gameSeed, n);
+        const busy = (lay.closets || []).concat(lay.drawers || []);
+        for (let i = 0; i < 6; i++) {
+          const side = rr.sign(), d = rr.range(1, L - 1);
+          if (busy.some(o => o.side === side && Math.abs(o.d - d) < 1.6)) continue;
+          const rock = at(new THREE.Mesh(cachedGeo('dodeca', 0.16 + rr.next() * 0.08), mats.debris), side * (W / 2 - 0.32), 0.1, d);
+          rock.rotation.set(rr.next() * 3, rr.next() * 3, 0);
+        }
+      }
       (lay.wallDecor || []).forEach((wd, i) => {
         const wx = wd.side * (W / 2 - 0.16);
         if (wd.type === 'sconce') {
@@ -2355,7 +2561,7 @@
           rGroup.add(pivot);
           let dupeMesh = null;
           if (!dd.correct) {
-            dupeMesh = stripMonsterLights(build3DDupeMonster());
+            dupeMesh = tintMonster(stripMonsterLights(build3DDupeMonster()), 'dupe');
             dupeMesh.position.set(dd.x, 1.75, -(L - 0.45));
             rGroup.add(dupeMesh);
           }
@@ -2366,7 +2572,7 @@
         addDoorFrame3D(lay.exitX, L, 2.4, 3.6);
         const pivot = new THREE.Group();
         pivot.position.set(lay.exitX - 1.2, 0, -(L - 0.08));
-        const tex = createDoorTexture(String(n).padStart(2, '0'), lay.requiresKey);
+        const tex = createDoorTexture(String(n).padStart(2, '0'), lay.requiresKey ? (lay.keysNeeded || 1) : 0);
         const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.65 });
         disposables.push(tex, mat);
         const dMesh = new THREE.Mesh(boxGeo(2.4, 3.6, 0.15), mat);
@@ -2386,7 +2592,7 @@
 
       // ---- 조명: 방마다 정확히 2개 (주 조명 + 출구/분위기 조명)
       const baseIntensity = lay.arch === 'darkRoom' ? 0.03 : (lay.arch === 'library' ? 0.62 : (lay.arch === 'escape' ? 1.6 : 1.0));
-      const roomLight = new THREE.PointLight(0xffd27d, baseIntensity, 26);
+      const roomLight = new THREE.PointLight(seasonLight(), baseIntensity, 26);
       roomLight.position.set(0, ROOM_H - 0.6, -L / 2);
       rGroup.add(roomLight);
       const acc = lay.accent || { x: lay.exitX, d: L - 1.6, color: 0xffc07a, intensity: lay.arch === 'darkRoom' ? 0.05 : 0.28, range: 7 };
@@ -2397,7 +2603,7 @@
       // ---- 피규어 (도서관)
       let figureMonsterMesh = null;
       if (lay.figure) {
-        figureMonsterMesh = stripMonsterLights(build3DFigureMonster());
+        figureMonsterMesh = tintMonster(stripMonsterLights(build3DFigureMonster()), 'figure');
         figureMonsterMesh.position.set(lay.figure.start.x, 0, -lay.figure.start.d);
         figureMonsterMesh.visible = true;
         rGroup.add(figureMonsterMesh);
@@ -2405,10 +2611,10 @@
 
       worldGroup.add(rGroup);
       return {
-        doorNum: n, roomArch: lay.arch, plan, layout: lay, roomTypeLabel: plan.label || '🛏️ 객실 구역',
+        doorNum: n, roomArch: lay.arch, plan, layout: lay, roomTypeLabel: seasonLabel(lay.arch) || plan.label || '🛏️ 객실 구역',
         group: rGroup, centerX: cx, roomW: W, roomLen: L, zStart: z0, zEnd: z0 - L, problem: info.problem,
         isDupeRoom: !!lay.dupeDoors, isBridgeChasmRoom: !!lay.chasm, bridgeExtended: !lay.chasm,
-        requiresKey: !!lay.requiresKey, keyUnlocked: !lay.requiresKey,
+        requiresKey: !!lay.requiresKey, keyUnlocked: !lay.requiresKey, keysNeeded: lay.keysNeeded || 1,
         puzzleSolved: plan.puzzle === 'none', unlocked: false,
         deviceDone: !(lay.device && lay.device.type === 'monolith'), gateOpen: false,
         doors, drawers, colliders: [], mechanism3D, terminalMesh, closets, closetObj: closets[0] || null, fakeDoors: fakeDoorList,
@@ -2541,6 +2747,7 @@
         if (anyBlockingModalOpen()) return;
         if (e.pointerId === joyPointerId) return;
         if (e.target.closest('button') || e.target.closest('#joystick-zone') || e.target.closest('#puzzle-modal') || e.target.closest('#emergency-modal') || e.target.closest('#heartbeat-modal') || e.target.closest('#game-hud .pointer-events-auto')) return;
+        if (canMouseLook && e.pointerType === 'mouse' && !window.__noPointerLock) { requestMouseLook(); return; }   // 클릭 = 마우스 둘러보기 켜기
         lookPointerId = e.pointerId;
         lastLookX = e.clientX;
         lastLookY = e.clientY;
@@ -2626,8 +2833,34 @@
       if (knob) knob.style.transform = 'translate(0px, 0px)';
       player.targetYaw = player.yaw; player.targetPitch = player.pitch;
     }
+    // V6: 데스크톱은 게임 화면에서 마우스 포인터를 잠가 '마우스를 움직이기만 해도' 둘러보기 (Pointer Lock)
+    const canMouseLook = !!(document.body.requestPointerLock || HTMLElement.prototype.requestPointerLock) && !(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    let mouseLocked = false;
+    function requestMouseLook() {
+      if (!canMouseLook || !isPlaying || anyBlockingModalOpen() || mouseLocked || window.__noPointerLock) return;
+      try { const el = renderer && renderer.domElement; const r = (el || document.body).requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (_) { /* 브라우저가 거부하면 드래그 방식 유지 */ }
+    }
+    function releaseMouseLook() { if (document.pointerLockElement) { try { document.exitPointerLock(); } catch (_) { /* */ } } }
+    function updateMouseLookHint() {
+      const h = document.getElementById('mouselook-hint'); if (!h) return;
+      const show = canMouseLook && isPlaying && !mouseLocked && !anyBlockingModalOpen() && !window.__noPointerLock;
+      h.classList.toggle('hidden', !show);
+    }
+    document.addEventListener('pointerlockchange', () => { mouseLocked = !!document.pointerLockElement; updateMouseLookHint(); });
+    document.addEventListener('mousemove', (e) => {
+      if (!mouseLocked || !isPlaying || anyBlockingModalOpen()) return;
+      const dx = Math.max(-150, Math.min(150, e.movementX || 0)), dy = Math.max(-150, Math.min(150, e.movementY || 0));
+      player.targetYaw -= dx * mouseSens * 0.0024;
+      player.targetPitch = Math.max(-0.68, Math.min(0.68, player.targetPitch - dy * mouseSens * 0.0020));
+    });
+    let mouseSens = 1.0;
+    function setMouseSens(v) { mouseSens = v; const l = document.getElementById('mouse-sens-value'); if (l) l.innerText = Math.round(v * 100) + '%'; try { localStorage.setItem('mathDoorsMouseSens', String(v)); } catch (_) { /* */ } }
+    try { const v = parseFloat(localStorage.getItem('mathDoorsMouseSens')); if (v > 0.2 && v < 3) mouseSens = v; } catch (_) { /* */ }
     function setModalFlag(name, open) {
       uiOpen[name] = open;
+      if (open) releaseMouseLook();
+      else if (!anyBlockingModalOpen()) requestMouseLook();   // 버튼 클릭(사용자 동작) 안에서 호출되므로 다시 잠글 수 있음
+      updateMouseLookHint();
       resetAllInput();
       if (typeof stopFootstepLoop === 'function') stopFootstepLoop();
       document.body.classList.toggle('modal-open', anyBlockingModalOpen());
@@ -2642,6 +2875,8 @@
       if (lay.creaks && lay.creaks.some(cr => Math.abs(lx - cr.x) < cr.hw && Math.abs(ld - cr.d) < cr.hd)) return 'wood';
       if (lay.chasm && ld > lay.chasm.d0 - 0.15 && ld < lay.chasm.d1 + 0.15) return 'wood';      // 나무 다리 상판
       if (ld > lay.L + 0.05) return 'wood';                                                       // 문턱
+      if (SEASON === 2) { if (room.roomArch === 'storage') return 'metal'; return Math.abs(lx) < lay.W * 0.117 ? 'metal' : 'stone'; }   // 가운데 배수 철망
+      if (SEASON === 3) { if (room.roomArch === 'storage') return 'metal'; return Math.abs(lx) < lay.W * 0.2 ? 'carpet' : 'stone'; }     // 낡은 카펫 / 판석
       const k = lay.maze ? 'parquet' : floorKindOf(room.roomArch);
       if (k === 'parquet') return 'wood';     // 지그재그·엇갈린 벽 방: 쪽매 나무 마루
       if (k !== 'hotel') return k;
@@ -2681,6 +2916,7 @@
       const now = performance.now();
       adaptPerformance(dt);
 
+      if (fieldScene.active) { updateFieldCutscene(dt); renderer.render(scene, camera); return; }
       if (!isPlaying) {
         camera.position.set(Math.sin(now * 0.0005) * 0.8, 1.8, -3.5);
         camera.rotation.set(0, 0, 0);
@@ -2896,6 +3132,8 @@
 
         if (curRoom.unlocked && res.d > curRoom.roomLen + 0.35) onPlayerCrossedDoorThreshold();
       }
+      if (escState.active) updateEscapeSequence(dt, curRoom);
+      else if (curRoom && curRoom.doorNum === maxDoors && curRoom.unlocked && !escState.alarmed) startFinalAlarm(curRoom);
 
       // 카메라 흔들림 및 손전등 방향 업데이트
       const shakeMult = reducedMotion ? 0.25 : 1.0;
@@ -3034,9 +3272,19 @@
     // 피격 · 3D 넉백 · 기절 · 블러 회복 연출
     // =========================================================================
     // lethal:false → 오답·듀프처럼 '학습 실수'로 맞는 경우 마지막 생명은 남겨 둔다 (한 번의 오답으로 게임 종료 금지)
+    // V6 시즌별 공격력: 시즌3(최종장) 러쉬·앰부쉬·피규어 2칸 (나머지·시즌1·2는 1칸)
+    function monsterDamage(title) {
+      const t = String(title || '');
+      const kind = /피규어/.test(t) ? 'figure' : (/러쉬|복도를 덮친/.test(t) ? 'rush' : (/앰부쉬/.test(t) ? 'ambush' : 'other'));
+      if (SEASON === 3 && (kind === 'rush' || kind === 'ambush' || kind === 'figure')) return 2;
+      // 시즌2는 공격력 대신 러쉬·시크 속도와 앰부쉬 횟수로 긴장감을 올린다 (도서관에서 두 번 만에 쓰러지지 않도록)
+      return 1;
+    }
     function applyPlayerHitEffect({ title, desc, knockDirX = 0, knockDirZ = 1, strength = 8.0, severity = 'heavy', lethal = true }) {
       playSfx('hitImpact');
-      hearts = lethal ? Math.max(0, hearts - 1) : Math.max(1, hearts - 1);
+      const dmg = lethal ? monsterDamage(title) : 1;
+      hearts = lethal ? Math.max(0, hearts - dmg) : Math.max(1, hearts - 1);
+      if (dmg > 1) desc = (desc || "충격으로 시야가 흐려집니다.") + ` (강한 공격: 생명 −${dmg})`;
       showSoundCue('💥', '공격받음', 'all');
       updateHUD();
 
@@ -3150,7 +3398,8 @@
         const nowRoom = activeRooms[currentDoor] || curRoom;
         rushState.x = nowRoom.centerX;
         rushState.z = nowRoom.zStart + 26.0;
-        rushState.speed = gameDifficulty === 'challenge' ? 22.0 : (gameDifficulty === 'easy' ? 16.5 : 19.0);
+        rushState.speed = (gameDifficulty === 'challenge' ? 22.0 : (gameDifficulty === 'easy' ? 16.5 : 19.0)) * (SEASON === 3 ? 1.15 : (SEASON === 2 ? 1.08 : 1));
+        rushState.secondPass = false;
         rushState.passSoundPlayed = false;
         setBgmMode('rush');
         playSfx('rushApproach', 0.9);
@@ -3219,12 +3468,22 @@
         }
 
         const emOpen = !document.getElementById('emergency-modal').classList.contains('hidden');
+        // V6 최종 시즌: 러쉬가 한 번 지나간 뒤 1.6초 만에 '두 번째 러쉬'가 다시 온다 (나가지 말고 기다려야 함)
+        if (SEASON === 3 && !rushState.secondPass && rushState.z < curRoom.zEnd - 10.0 && !emOpen) {
+          rushState.secondPass = true;
+          rushState.z = curRoom.zStart + 26.0 + rushState.speed * 1.6;
+          rushState.hasHitPlayer = false; rushState.quizTriggered = false; rushState.passSoundPlayed = false;
+          playSfx('rushApproach', 0.9);
+          showSoundCue('⚡', '굉음이 다시 돌아온다!', 'all');
+          showSubtleSubtitle(['끝이 아니다… 두 번째 굉음이 온다!'], 1);
+          return;
+        }
         if (rushState.z < curRoom.zEnd - 10.0 && !emOpen) {
           rushState.active = false;
           rushState.phase = 'NONE';
           rushMonster3D.visible = false;
           if (curRoom.roomLight) {
-            curRoom.roomLight.color.setHex(0xffd27d);
+            curRoom.roomLight.color.setHex(seasonLight());
             curRoom.roomLight.intensity = curRoom.baseLightIntensity;
           }
           hideState.graceUntil = performance.now() + 4000;
@@ -3319,7 +3578,7 @@
           rushState.phase = 'NONE';
           rushMonster3D.visible = false;
           if (curRoom.roomLight) {
-            curRoom.roomLight.color.setHex(0xffd27d);
+            curRoom.roomLight.color.setHex(seasonLight());
             curRoom.roomLight.intensity = curRoom.baseLightIntensity;
           }
           exitClosetImmediate();
@@ -3498,7 +3757,7 @@
 
       ambushState.warning = true;
       ambushState.active = false;
-      ambushState.passesLeft = gameDifficulty === 'easy' ? 2 : (gameDifficulty === 'challenge' ? 4 + Math.floor(Math.random() * 2) : 3);
+      ambushState.passesLeft = (gameDifficulty === 'easy' ? 2 : (gameDifficulty === 'challenge' ? 4 + Math.floor(Math.random() * 2) : 3)) + (SEASON > 1 ? 1 : 0);
 
       playSfx('ambushWarn', 0.85);
       showSoundCue('🌀', '청록빛 깜빡임 · 날카로운 공명음');
@@ -3518,7 +3777,7 @@
         if (lastFlickRoom && lastFlickRoom !== fr) restoreRoomLights();
         lastFlickRoom = fr;
         flickStep++;
-        fr.roomLight.color.setHex(flickStep % 2 === 0 ? 0x2dd4bf : 0xffd27d);
+        fr.roomLight.color.setHex(flickStep % 2 === 0 ? 0x2dd4bf : seasonLight());
         fr.roomLight.intensity = reducedMotion ? 0.5 : (Math.random() * 1.4);
       }, 190);
 
@@ -3601,7 +3860,7 @@
           ambushState.active = false;
           ambushMonster3D.visible = false;
           if (curRoom.roomLight) {
-            curRoom.roomLight.color.setHex(0xffd27d);
+            curRoom.roomLight.color.setHex(seasonLight());
             curRoom.roomLight.intensity = curRoom.baseLightIntensity;
           }
           showSubtleSubtitle(["불길한 공명음이 마침내 완전히 멀어졌다…"], 1);
@@ -3622,7 +3881,7 @@
       const lp = toLocal(curRoom, player.x, player.z);
       seekState.lx = 0; seekState.ld = -4.5;   // 입구 뒤쪽 어둠에서 솟아오름 (바로 붙잡지 않도록 거리 확보)
       seekState.trail = [{ x: lp.x, d: lp.d }];
-      seekState.speed = gameDifficulty === 'easy' ? 3.85 : (gameDifficulty === 'challenge' ? 4.6 : 4.25);
+      seekState.speed = (gameDifficulty === 'easy' ? 3.85 : (gameDifficulty === 'challenge' ? 4.6 : 4.25)) * (SEASON === 3 ? 1.06 : (SEASON === 2 ? 1.03 : 1));
       seekState.runCycle = 0;
       seekState.wrongDoorCooldown = 0;
       seekState.x = curRoom.centerX + seekState.lx; seekState.z = curRoom.zStart - seekState.ld;
@@ -3771,7 +4030,7 @@
       const lp = toLocal(curRoom, player.x, player.z);
       const hidden = closetState === 'HIDDEN' || closetState === 'ENTERING';
       const dist = Math.hypot(lp.x - figureState.lx, lp.d - figureState.ld);
-      const sense = gameDifficulty === 'easy' ? 0.82 : (gameDifficulty === 'challenge' ? 1.2 : 1.0);
+      const sense = (gameDifficulty === 'easy' ? 0.82 : (gameDifficulty === 'challenge' ? 1.2 : 1.0)) * (SEASON === 3 ? 1.05 : 1);   // 난이도 차이가 이미 크므로 시즌 보정은 최종장만 살짝
       const sniff = gameDifficulty === 'easy' ? 1.8 : (gameDifficulty === 'challenge' ? 2.8 : 2.3);
 
       // --- 감지: 발소리 반경(걷기 7.5 / 웅크림 2.2 / 삐걱 마루 9) + 바로 곁에서는 웅크려도 냄새·숨소리로 감지
@@ -4419,7 +4678,7 @@
             if (dObj.lockedOut) return setProx('dupeLocked' + i, '⛔', '가짜였던 문 (다시 열 수 없음)', () => showToast('이미 닫힌 가짜 문입니다. 다른 문을 확인하세요.'));
             return setProx('dupe' + i, '🚪', `[E / 터치] 「${formatMathHTML(dObj.choiceVal)}」 문 열기`, () => interactDupeDoor3D(dObj));
           }
-          if (curRoom.requiresKey && !curRoom.keyUnlocked) return setProx('doorKey' + keysCount, '🗝️', keysCount > 0 ? '[E / 터치] 열쇠로 자물쇠 열기' : '[잠김] 서랍에서 열쇠를 먼저 찾으세요', () => interactStandardDoor3D(curRoom, dObj));
+          if (curRoom.requiresKey && !curRoom.keyUnlocked) { const it = itemCfg(), need = curRoom.keysNeeded || 1; return setProx('doorKey' + keysCount, it.icon, keysCount >= need ? `[E / 터치] ${it.door}` : `[잠김] ${it.where} ${need}개 찾으세요 (${keysCount}/${need})`, () => interactStandardDoor3D(curRoom, dObj)); }
           if (!curRoom.puzzleSolved) return setProx('doorPuzzle', '🔒', '[E / 터치] 잠긴 문 보안 장치 풀기', () => interactStandardDoor3D(curRoom, dObj));
           return setProx('doorOpen', '🚪', '[E / 터치] 문 열기', () => interactStandardDoor3D(curRoom, dObj));
         }
@@ -4451,7 +4710,7 @@
 
         if (dr.lootType === 'key') {
           keysCount++;
-          showToast("🗝️ 서랍 안에서 황금 열쇠를 찾았습니다!");
+          { const it = itemCfg(), r = activeRooms[currentDoor], need = (r && r.keysNeeded) || 1; showToast(`${it.icon} 서랍 안에서 ${it.name}을(를) 찾았습니다! (${Math.min(keysCount, need)}/${need})`); }
         } else if (dr.lootType === 'battery') {
           flashlightBattery = Math.min(100, flashlightBattery + 45);
           showToast("🔋 손전등 배터리를 충전했습니다! (+45%)");
@@ -4472,19 +4731,24 @@
       check3DProximity();
     }
 
+    // V6: 시즌 아이템(열쇠 / 퓨즈 / 룬 조각)을 필요한 개수만큼 모았으면 문 잠금 해제
+    function tryUseRoomItems(curRoom) {
+      const it = itemCfg(), need = curRoom.keysNeeded || 1;
+      if (keysCount >= need) {
+        keysCount -= need;
+        curRoom.keyUnlocked = true;
+        playSfx('unlock');
+        showToast(`${it.icon} ${it.name} ${need}개로 잠금을 풀었습니다!`);
+        updateHUD();
+        return true;
+      }
+      playSfx('doorLocked', 0.8);
+      showToast(`${it.icon} ${it.name}이(가) ${need}개 필요합니다 (지금 ${keysCount}개). 방 안의 서랍을 찾아보세요.`, 2600);
+      return false;
+    }
     function interactStandardDoor3D(curRoom, dObj) {
       if (curRoom.requiresKey && !curRoom.keyUnlocked) {
-        if (keysCount > 0) {
-          keysCount--;
-          curRoom.keyUnlocked = true;
-          playSfx('unlock');
-          showToast("🗝️ 열쇠로 자물쇠를 풀었습니다! 이제 보안 장치를 해결하세요.");
-          updateHUD();
-          openPuzzleModal();
-        } else {
-          playSfx('doorLocked', 0.8);
-          showToast("🗝️ 문이 열쇠로 잠겨 있습니다. 방 안의 서랍을 열어 열쇠를 찾으세요.");
-        }
+        if (tryUseRoomItems(curRoom)) openPuzzleModal();
         return;
       }
 
@@ -4571,8 +4835,16 @@
           return;
         }
       }
-      if (currentDoor >= maxDoors) {
-        finishGame(true);
+      if (currentDoor > maxDoors) return;              // 탈출 통로 안 (끝에 닿으면 completeEscape)
+      if (currentDoor === maxDoors) {
+        currentDoor++;
+        ensureRoomBuilt(currentDoor);
+        updateRoomVisibility();
+        clearAllMonsterTimers();
+        closeHeartbeat();
+        if (figureState.active) { figureState.active = false; figureState.hunt = false; }
+        updateHUD();
+        startEscapeSequence();
         return;
       }
       if (seekState.active) {
@@ -4640,16 +4912,7 @@
         return;
       }
       if (curRoom.requiresKey && !curRoom.keyUnlocked) {
-        if (keysCount > 0) {
-          keysCount--;
-          curRoom.keyUnlocked = true;
-          playSfx('unlock');
-          showToast("🗝️ 열쇠로 자물쇠를 해제했습니다!");
-          updateHUD();
-        } else {
-          showToast("🗝️ 먼저 방 안의 서랍에서 열쇠를 찾아야 합니다.");
-          return;
-        }
+        if (!tryUseRoomItems(curRoom)) return;
       }
 
       currentProblem = curRoom.problem;
@@ -5166,7 +5429,7 @@
     }
 
     function updateHUD() {
-      document.getElementById('door-badge').innerText = `DOOR ${String(currentDoor).padStart(2, '0')} / ${maxDoors}`;
+      document.getElementById('door-badge').innerText = currentDoor > maxDoors ? '🏃 탈출 통로' : `DOOR ${String(currentDoor).padStart(2, '0')} / ${maxDoors}`;
       const curRoom = activeRooms[currentDoor];
       if (curRoom) {
         document.getElementById('room-type-badge').innerText = curRoom.roomTypeLabel;
@@ -5174,7 +5437,7 @@
       document.getElementById('hearts-box').innerText = "❤️".repeat(Math.max(0, hearts)) + "🖤".repeat(Math.max(0, 3 - hearts));
 
       const keyBadge = document.getElementById('key-badge');
-      keyBadge.innerText = `🗝️ 열쇠 ${keysCount}`;
+      keyBadge.innerText = `${itemCfg().icon} ${itemCfg().name} ${keysCount}`;
       keyBadge.className = keysCount > 0
         ? "px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-black"
         : "px-2 py-0.5 rounded bg-slate-800 text-slate-400";
@@ -5262,7 +5525,7 @@
     // 미로 방에서는 옷장까지 돌아가는 길이 있어 경고 시간을 1.5초 더 준다 (V5.2)
     function mazeWarnBonus() { const r = activeRooms[currentDoor]; return r && r.layout && r.layout.maze ? 1500 : 0; }
     function restoreRoomLights() {
-      Object.values(activeRooms).forEach(r => { if (r.roomLight) { r.roomLight.color.setHex(0xffd27d); r.roomLight.intensity = r.baseLightIntensity; } });
+      Object.values(activeRooms).forEach(r => { if (r.roomLight) { r.roomLight.color.setHex(seasonLight()); r.roomLight.intensity = r.baseLightIntensity; } });
       lastFlickRoom = null;
     }
     let lastFlickRoom = null;
@@ -5320,6 +5583,11 @@
         restore = null;
       }
 
+      // V6: 난이도 = 시즌 → 맵 생성 전에 시즌 분위기·규칙 적용
+      SEASON = seasonOf(gameDifficulty);
+      Core.setSeason(SEASON);
+      applySeasonLook();
+      endEscapeSequence(true);
       clearAllMonsterTimers();
       closePuzzleModal();
       exitClosetImmediate();
@@ -5385,6 +5653,8 @@
       resetAllInput();
 
       isPlaying = true;
+      requestMouseLook(); updateMouseLookHint();
+      if (!restore) showSeasonIntro();
       updateHUD();
       if (restore) showToast(`💾 DOOR ${String(currentDoor).padStart(2, '0')} 체크포인트에서 이어합니다.`, 2400);
       scheduleRoomMonsterEvents(room);
@@ -5440,6 +5710,8 @@
 
     function returnToLobby() {
       isPlaying = false;
+      endEscapeSequence(true);
+      releaseMouseLook(); updateMouseLookHint();
       clearAllMonsterTimers();
       closePuzzleModal();
       exitClosetImmediate();
@@ -5454,8 +5726,167 @@
       refreshSavePanel();
     }
 
+    // =========================================================================
+    // V6 마지막 탈출: 마지막 문이 열리면 경보 → 통로에 들어서면 천장이 무너지며 뒤에서 쫓아옴
+    // =========================================================================
+    const escState = { active: false, alarmed: false, t: 0, wallD: -6, speed: 2.8, rocks: [], wallMesh: null, hudT: 0, done: false };
+    function startFinalAlarm(room) {
+      escState.alarmed = true;
+      playSfx('doorSlam', 0.8); playSfx('rushDistant', 0.8);
+      player.shakeIntensity = Math.max(player.shakeIntensity, 0.8);
+      showSoundCue('⚠️', '건물이 무너지는 소리', 'all');
+      showSubtleSubtitle([SEASON === 1 ? '쿠르릉… 호텔 전체가 흔들린다! 열린 문으로 달려라!' : (SEASON === 2 ? '배관이 터진다! 물이 차오르기 전에 출구로!' : '성이 무너진다! 저 빛을 향해 달려라!')], 1.2);
+      if (room.roomLight) room.roomLight.color.setHex(0xff3a2a);
+    }
+    function startEscapeSequence() {
+      const room = activeRooms[currentDoor];
+      escState.active = true; escState.done = false; escState.t = 0; escState.wallD = -7; escState.hits = 0;
+      escState.speed = SEASON === 3 ? 3.15 : (SEASON === 2 ? 2.9 : 2.6);
+      setBgmMode('seek');
+      playSfx('seekRoar', 0.6);
+      showSubtleSubtitle(['뒤에서 천장이 무너지고 있다! 멈추지 말고 끝까지 달려!'], 1.2);
+      // 무너지는 벽(검은 먼지 벽) + 떨어지는 돌
+      const g = new THREE.Group();
+      const dustMat = new THREE.MeshBasicMaterial({ color: 0x0a0806, transparent: true, opacity: 0.92 });
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(room.roomW + 1, ROOM_H, 1.2), dustMat); g.add(wall);
+      for (let i = 0; i < 14; i++) { const r = new THREE.Mesh(cachedGeo('dodeca', 0.2 + Math.random() * 0.25), new THREE.MeshStandardMaterial({ color: SEASON === 3 ? 0x5a4a40 : 0x4a4644, roughness: 1 })); r.userData.v = 0; g.add(r); escState.rocks.push(r); }
+      escState.rocks.forEach(r => { r.position.set(room.centerX + (Math.random() - 0.5) * room.roomW, ROOM_H + Math.random() * 3, room.zStart + 2); });
+      scene.add(g); escState.wallMesh = g;
+      if (room.roomLight) { room.roomLight.color.setHex(SEASON === 3 ? 0xfff2d0 : 0xff5533); }
+      document.getElementById('escape-hud').classList.remove('hidden');
+    }
+    function updateEscapeSequence(dt, room) {
+      if (!room || escState.done) return;
+      escState.t += dt;
+      const lp = toLocal(room, player.x, player.z);
+      if (escState.t > 1.4) escState.wallD += escState.speed * dt;
+      // 플레이어가 너무 앞서면 벽이 조금 빨라짐(긴장 유지), 너무 뒤처지면 원래 속도
+      if (lp.d - escState.wallD > 12) escState.wallD += 1.2 * dt;
+      const wz = room.zStart - escState.wallD;
+      escState.wallMesh.children[0].position.set(room.centerX, ROOM_H / 2, wz);
+      escState.rocks.forEach((r, i) => {
+        r.userData.v += 18 * dt; r.position.y -= r.userData.v * dt; r.rotation.x += dt * 3;
+        if (r.position.y < 0.15) { r.position.set(room.centerX + (Math.random() - 0.5) * (room.roomW - 1), ROOM_H + Math.random() * 1.5, wz - 0.5 - Math.random() * (i % 3 === 0 ? 7 : 3)); r.userData.v = 0; }
+      });
+      const gap = lp.d - escState.wallD;
+      player.shakeIntensity = Math.max(player.shakeIntensity, gap < 6 ? 0.9 : 0.35);
+      if (room.roomLight) room.roomLight.intensity = room.baseLightIntensity * (0.55 + 0.45 * Math.abs(Math.sin(escState.t * 9)));
+      if (gap < 0.6 && player.stunTimer <= 0) {
+        escState.hits++;
+        applyPlayerHitEffect({ title: '🪨 무너지는 천장에 휩쓸렸습니다!', desc: '잔해를 피해 앞으로 계속 달리세요!', knockDirX: 0, knockDirZ: -1, strength: 9, severity: 'light' });
+        escState.wallD = lp.d - 7;
+        if (hearts <= 0) { escState.done = true; return; }
+      }
+      escState.hudT -= dt;
+      if (escState.hudT <= 0) {
+        escState.hudT = 0.2;
+        const left = Math.max(0, Math.round(room.roomLen - 1.5 - lp.d));
+        document.getElementById('escape-hud').innerText = `⚠️ 붕괴 중! 출구까지 ${left} m · 뒤 ${Math.max(0, Math.round(gap))} m`;
+      }
+      if (lp.d > room.roomLen - 2.2) completeEscape();
+    }
+    function endEscapeSequence(full) {
+      escState.active = false; escState.done = true;
+      if (escState.wallMesh) { scene.remove(escState.wallMesh); escState.wallMesh.traverse(o => { if (o.geometry && o.geometry.type === 'BoxGeometry') o.geometry.dispose(); }); escState.wallMesh = null; }
+      escState.rocks = [];
+      const h = document.getElementById('escape-hud'); if (h) h.classList.add('hidden');
+      if (full) { escState.alarmed = false; endFieldCutscene(); const w = document.getElementById('whiteout'); if (w) w.style.opacity = '0'; }
+    }
+    function completeEscape() {
+      escState.done = true;
+      isPlaying = false;
+      releaseMouseLook(); updateMouseLookHint();
+      stopFootstepLoop();
+      endEscapeSequence(false);
+      playSfx('win', 0.8);
+      const w = document.getElementById('whiteout');
+      w.style.opacity = '1';
+      if (SEASON === 3) {
+        setTimeout(() => { startFieldCutscene(); w.style.opacity = '0'; }, 1700);
+      } else {
+        setTimeout(() => { finishGame(true); w.style.opacity = '0'; }, 1800);
+      }
+    }
+
+    // ---- 최종장 엔딩: 밝은 들판… 그런데 아주 잠깐 하늘이 '전등처럼' 깜빡이고, 멀리 문틀 하나가 서 있다 (다음 이야기 힌트)
+    const fieldScene = { active: false, t: 0, group: null, saved: null, sun: null, flickered: false };
+    function grassTexture() {
+      const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'), r = texRng(777);
+      x.fillStyle = '#3f7f2c'; x.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 2600; i++) { const v = r(); x.fillStyle = `rgba(${40 + v * 60},${110 + v * 70},${30 + v * 30},0.6)`; x.fillRect(r() * 256, r() * 256, 1.5, 3 + r() * 4); }
+      for (let i = 0; i < 60; i++) { x.fillStyle = r() < 0.5 ? '#f3e37a' : '#f6f2f0'; x.beginPath(); x.arc(r() * 256, r() * 256, 1.6, 0, Math.PI * 2); x.fill(); }
+      const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(60, 60); return t;
+    }
+    function startFieldCutscene() {
+      document.getElementById('game-hud').classList.add('hidden');
+      document.getElementById('crosshair').classList.add('hidden');
+      fieldScene.saved = { bg: scene.background, fog: scene.fog.color.getHex(), dens: scene.fog.density, hemi: hemiLight ? hemiLight.intensity : 0, amb: ambientLight.intensity, tm: renderer.toneMappingExposure };
+      if (worldGroup) worldGroup.visible = false;
+      [rushMonster3D, ambushMonster3D, seekMonster3D, screechMonster3D, jackMonster3D, hideMonster3D].forEach(m => { if (m) m.visible = false; });
+      if (dustPoints) dustPoints.visible = false;
+      flashlightSpot.intensity = 0; playerPointLight.intensity = 0; glowLight.intensity = 0;
+      scene.background = new THREE.Color(0x6fb4f5); scene.fog.color.setHex(0xb8dcff); scene.fog.density = 0.0032;
+      if (hemiLight) { hemiLight.color.setHex(0xffffff); hemiLight.groundColor.setHex(0x6a8a4a); hemiLight.intensity = 1.25; }
+      ambientLight.intensity = 0.55;
+      const g = new THREE.Group();
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshStandardMaterial({ map: grassTexture(), roughness: 1 }));
+      ground.rotation.x = -Math.PI / 2; g.add(ground);
+      const hillMat = new THREE.MeshStandardMaterial({ color: 0x5f9a48, roughness: 1 });
+      for (let i = 0; i < 7; i++) { const h = new THREE.Mesh(new THREE.SphereGeometry(40 + i * 6, 20, 10), hillMat); h.scale.y = 0.18; h.position.set((i - 3) * 70 + 20, -2, -180 - (i % 2) * 40); g.add(h); }
+      const trunk = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 1 }), leaf = new THREE.MeshStandardMaterial({ color: 0x3f7a35, roughness: 1 });
+      for (let i = 0; i < 26; i++) {
+        const tx = (Math.random() < 0.5 ? -1 : 1) * (12 + Math.random() * 60), tz = -20 - Math.random() * 140;
+        const t1 = new THREE.Mesh(cachedGeo('cyl', 0.25, 0.35, 2.4, 6), trunk); t1.position.set(tx, 1.2, tz); g.add(t1);
+        const t2 = new THREE.Mesh(cachedGeo('cone', 1.8, 4.2, 8), leaf); t2.position.set(tx, 4.2, tz); g.add(t2);
+      }
+      // 힌트 1: 들판 한가운데 덩그러니 서 있는 낡은 문틀 (호텔 문과 같은 금색 번호판)
+      const fr = new THREE.Group();
+      const wood = new THREE.MeshStandardMaterial({ color: 0x5a3520, roughness: 0.8 }), plate = new THREE.MeshStandardMaterial({ color: 0xc89a4b, metalness: 0.6, roughness: 0.4 });
+      [[-1.25, 1.9], [1.25, 1.9]].forEach(([x, y]) => { const p = new THREE.Mesh(new THREE.BoxGeometry(0.22, 3.8, 0.25), wood); p.position.set(x, y, 0); fr.add(p); });
+      const top = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.25, 0.3), wood); top.position.y = 3.9; fr.add(top);
+      const pl = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.22, 0.04), plate); pl.position.set(0, 3.45, 0.14); fr.add(pl);
+      fr.position.set(9, 0, -62); fr.rotation.y = -0.35; g.add(fr);
+      // 해 (힌트 2: 6초쯤 전등처럼 '딸깍' 하고 한 번 깜빡인다)
+      const sun = new THREE.Mesh(new THREE.SphereGeometry(9, 20, 12), new THREE.MeshBasicMaterial({ color: 0xfff6c8 }));
+      sun.position.set(-60, 70, -260); g.add(sun); fieldScene.sun = sun;
+      scene.add(g); fieldScene.group = g;
+      renderer.toneMappingExposure = 1.0;
+      document.getElementById('vignette-layer').style.opacity = '0.35';
+      fieldScene.active = true; fieldScene.t = 0; fieldScene.flickered = false;
+      camera.position.set(0, 1.7, 6); camera.rotation.set(0, 0, 0);
+      setBgmMode('safe');
+      showSubtleSubtitle(['…빛이다. 바람 냄새. 드디어 밖으로 나왔다.'], 1.2);
+    }
+    function updateFieldCutscene(dt) {
+      fieldScene.t += dt;
+      const t = fieldScene.t;
+      camera.position.set(Math.sin(t * 0.7) * 0.05, 1.7 + Math.sin(t * 4.2) * 0.04, 6 - t * 1.6);
+      camera.rotation.set(0.02, -0.08 + Math.sin(t * 0.25) * 0.12, 0);
+      if (!fieldScene.flickered && t > 6.2) {
+        fieldScene.flickered = true;
+        playSfx('flicker', 0.35);
+        const sky = scene.background.getHex();
+        scene.background.setHex(0x101418); if (fieldScene.sun) fieldScene.sun.visible = false; if (hemiLight) hemiLight.intensity = 0.2;
+        setTimeout(() => { if (!fieldScene.active) return; scene.background.setHex(sky); if (fieldScene.sun) fieldScene.sun.visible = true; if (hemiLight) hemiLight.intensity = 1.25; }, 140);
+      }
+      if (t > 9.5 && !fieldScene.ending) { fieldScene.ending = true; finishGame(true); }
+    }
+    function endFieldCutscene() {
+      if (!fieldScene.group) { fieldScene.active = false; return; }
+      scene.remove(fieldScene.group);
+      fieldScene.group.traverse(o => { if (o.geometry && !GEO_CACHE_HAS(o.geometry)) o.geometry.dispose(); });
+      fieldScene.group = null; fieldScene.active = false; fieldScene.ending = false;
+      const sv = fieldScene.saved;
+      if (sv) { scene.background = new THREE.Color(seasonCfg().fog); scene.fog.color.setHex(seasonCfg().fog); scene.fog.density = sv.dens; if (hemiLight) hemiLight.intensity = sv.hemi; ambientLight.intensity = sv.amb; renderer.toneMappingExposure = sv.tm; }
+      if (worldGroup) worldGroup.visible = true;
+      document.getElementById('vignette-layer').style.opacity = '';
+      if (dustPoints) dustPoints.visible = gfxQuality !== 'lite';
+    }
+    function GEO_CACHE_HAS(geo) { for (const v of GEO_CACHE.values()) if (v === geo) return true; return false; }
+
     function finishGame(isWin) {
       isPlaying = false;
+      releaseMouseLook(); updateMouseLookHint();
       clearAllMonsterTimers();
       closePuzzleModal();
       exitClosetImmediate();
@@ -5481,9 +5912,10 @@
         Core.SaveManager.clear();
         badge.innerText = '🏆';
         badge.className = "w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4 border-4 border-emerald-400 bg-emerald-950/60";
-        title.innerText = 'HOTEL ESCAPED!';
+        title.innerText = seasonCfg().win;
         title.className = "title-font text-4xl sm:text-6xl text-emerald-400 mb-3";
-        desc.innerText = `축하합니다! ${maxDoors}개의 모든 방과 수학 장치를 돌파하고 무사히 호텔을 탈출했습니다!`;
+        desc.innerHTML = `축하합니다! ${maxDoors}개의 모든 방과 수학 장치를 돌파하고 <b>${seasonCfg().place}</b>에서 탈출했습니다!` +
+          (seasonCfg().teaser ? `<br><span class="block mt-3 text-slate-400 text-sm italic">${seasonCfg().teaser}</span><span class="block mt-1 text-amber-300/80 text-xs">다음 이야기: ${SEASONS[SEASON + 1].tag} — 난이도 '${SEASON === 1 ? '보통' : '도전'}'으로 시작</span>` : `<br><span class="block mt-3 text-slate-500 text-xs">바람이 분다. 따뜻한 햇살. …아주 잠깐, 하늘이 깜빡였던 것 같다.</span>`);
       } else {
         badge.innerText = '💀';
         badge.className = "w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4 border-4 border-rose-500 bg-rose-950/60";
@@ -5498,7 +5930,8 @@
       }
 
       stats.innerHTML = `
-        <div class="flex justify-between"><span>도달한 구역</span><b class="text-amber-300">DOOR ${currentDoor} / ${maxDoors}</b></div>
+        <div class="flex justify-between"><span>도달한 구역</span><b class="text-amber-300">${isWin ? '탈출 성공' : 'DOOR ' + Math.min(currentDoor, maxDoors) + ' / ' + maxDoors}</b></div>
+        <div class="flex justify-between"><span>시즌</span><b class="text-emerald-300">${seasonCfg().tag} · ${seasonCfg().place}</b></div>
         <div class="flex justify-between"><span>해결한 수학 장치</span><b class="text-sky-300">${puzzlesSolvedCount}개</b></div>
         <div class="flex justify-between"><span>남은 생명</span><b class="text-rose-300">${hearts} / 3</b></div>
       `;
@@ -5513,7 +5946,7 @@
           playing: isPlaying, door: currentDoor, maxDoors, hearts, keys: keysCount, seed: gameSeed, units: selectedUnits.slice(),
           closet: closetState, ui: Object.assign({}, uiOpen), crouch: player.isCrouching,
           player: r ? { x: player.x - r.centerX, d: r.zStart - player.z, wx: player.x, wz: player.z, yaw: player.yaw } : null,
-          room: r ? { arch: r.roomArch, solved: r.puzzleSolved, unlocked: r.unlocked, bridged: r.bridgeExtended, deviceDone: r.deviceDone, gateOpen: r.gateOpen, keyUnlocked: r.keyUnlocked, W: r.roomW, L: r.roomLen, events: r.plan.events, problemType: r.problem && r.problem.type, device: r.layout.device && r.layout.device.type } : null,
+          room: r ? { arch: r.roomArch, solved: r.puzzleSolved, unlocked: r.unlocked, bridged: r.bridgeExtended, deviceDone: r.deviceDone, gateOpen: r.gateOpen, keyUnlocked: r.keyUnlocked, keysNeeded: r.keysNeeded || 1, W: r.roomW, L: r.roomLen, events: r.plan.events, problemType: r.problem && r.problem.type, device: r.layout.device && r.layout.device.type } : null,
           figure: { active: figureState.active, mode: figureState.mode, hunt: figureState.hunt, x: figureState.lx, d: figureState.ld },
           seek: { active: seekState.active, x: seekState.lx, d: seekState.ld, stagger: seekState.stagger },
           rush: { warning: rushState.warning, active: rushState.active, phase: rushState.phase }, ambush: { warning: ambushState.warning, active: ambushState.active },
@@ -5554,6 +5987,7 @@
 
     window.onload = function () {
       initThreeJS();
+      try { const ms = document.getElementById('mouse-sens'); if (ms) { ms.value = Math.round(mouseSens * 100); document.getElementById('mouse-sens-value').innerText = Math.round(mouseSens * 100) + '%'; } } catch (_) { /* */ }
     };
   </script>
 </body>

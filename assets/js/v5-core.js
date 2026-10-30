@@ -11,6 +11,13 @@
   'use strict';
 
   const CORE_VERSION = '5.0.0';
+  // V6 시즌: 1 = 호텔(쉬움), 2 = 지하 하수도·보일러실(보통), 3 = 무너지는 성(도전/최종)
+  //  - 시즌마다 계획표·방 배치 난수가 달라져 같은 시드라도 맵이 다름 (시즌 1은 예전 맵 그대로)
+  //  - 진행 아이템: 열쇠 방에 필요한 개수 시즌1 1개 / 시즌2 퓨즈 2개 / 시즌3 룬 조각 3개, 시즌2·3은 미로 방도 아이템을 요구
+  let SEASON = 1;
+  function setSeason(n) { SEASON = (n === 2 || n === 3) ? n : 1; }
+  function getSeason() { return SEASON; }
+  const sKey = () => (SEASON > 1 ? 's' + SEASON : null);
   const ROOM_H = 5.4;
   const PLAYER_R = 0.42;
   const WALL_T = 0.14;          // half thickness of outer walls
@@ -91,7 +98,7 @@
   function planStage(N, seed) {
     const cfg = stageConfig(N);
     for (let attempt = 0; attempt < 400; attempt++) {
-      const rng = makeRng('plan', seed, N, attempt);
+      const rng = SEASON > 1 ? makeRng('plan', seed, N, attempt, sKey()) : makeRng('plan', seed, N, attempt);
       const arch = new Array(N + 1).fill(null);
       arch[1] = 'guest';
       cfg.libs.forEach(d => { arch[d] = 'library'; });
@@ -151,7 +158,7 @@
         arch[d] = f;
       }
       // V5.2: 미로 방 최소 개수 보장 (10문 1개, 20문 3개, 30문 5개)
-      const wantMaze = Math.max(1, Math.round(N / 6));
+      const wantMaze = Math.max(1, Math.round(N / 6)) + (SEASON === 2 ? 1 : 0);
       let haveMaze = arch.filter(a => a === 'maze').length;
       for (const d of rng.shuffle(Array.from({ length: N - 1 }, (_, i) => i + 2))) {
         if (haveMaze >= wantMaze) break;
@@ -168,12 +175,13 @@
         const recovering = d > 1 && HEAVY.includes(arch[d - 1]);
         if (d >= 3 && RUSH_ARCHS.has(a) && !recovering && d - lastDanger >= 2) {
           const r = rng.next();
-          if (r < 0.40) e.rush = true;
-          else if (d >= 4 && r < 0.62) e.ambush = true;
+          const pr = SEASON === 3 ? 0.46 : (SEASON === 2 ? 0.42 : 0.40), pa = SEASON === 3 ? 0.76 : (SEASON === 2 ? 0.66 : 0.62);
+          if (r < pr) e.rush = true;
+          else if (d >= 4 && r < pa) e.ambush = true;
           if (e.rush || e.ambush) lastDanger = d;
         }
         if (a === 'darkRoom') e.screech = true;
-        else if (!e.rush && !e.ambush && !['seek', 'library', 'bridge'].includes(a) && d >= 2) e.screech = rng.chance(0.22);
+        else if (!e.rush && !e.ambush && !['seek', 'library', 'bridge'].includes(a) && d >= 2) e.screech = rng.chance(SEASON === 3 ? 0.36 : (SEASON === 2 ? 0.28 : 0.22));
         plan.push({ door: d, arch: a, label: ARCH_LABELS[a], events: e, puzzle: puzzleKindFor(a) });
       }
       // guarantee at least one rush and one ambush where possible
@@ -761,7 +769,7 @@
   };
 
   function buildLayout(door, arch, seed, puzzle, attempt, safe, events) {
-    const rng = makeRng('room', seed, door, arch, attempt);
+    const rng = SEASON > 1 ? makeRng('room', seed, door, arch, attempt, sKey()) : makeRng('room', seed, door, arch, attempt);
     const dm = DIMS[arch] || DIMS.guest;
     const W = Math.round(rng.range(dm[0], dm[1]) * 10) / 10;
     const L = Math.round(rng.range(dm[2], dm[3]) * 10) / 10;
@@ -811,7 +819,35 @@
       else if (p.device === 'gear') lay.device = { type: 'gear', x: lay.exitX, d: lay.frontD };
     }
     addWallDecor(lay, rng);
+    applySeasonItems(lay, rng);
     return lay;
+  }
+  // 시즌별 진행 아이템: 열쇠 방은 시즌 수만큼 아이템, 시즌2·3 미로는 일부가 아이템 1~2개를 요구
+  function applySeasonItems(lay, rng) {
+    lay.season = SEASON;
+    lay.keysNeeded = lay.requiresKey ? 1 : 0;
+    if (SEASON === 1 || lay.chasm || lay.safeFallback) return;
+    let need = 0;
+    if (lay.requiresKey) need = SEASON;                                   // 퓨즈 2 / 룬 조각 3
+    else if (lay.maze && rng.chance(SEASON === 3 ? 0.7 : 0.5)) need = SEASON === 3 ? 2 : 1;
+    if (!need) return;
+    // 아이템 수만큼 서랍이 없으면 벽에 서랍을 더 놓는다
+    for (let t = 0; t < 12 && lay.drawers.length < need + (lay.maze ? 0 : 1); t++) {
+      const side = t % 2 ? 1 : -1, f = [0.3, 0.55, 0.8, 0.42, 0.68, 0.22][t % 6];
+      placeDrawer(lay, side, [f * lay.L, f * lay.L + 1.2, f * lay.L - 1.2], 'random');
+    }
+    const idx = lay.drawers.map((dr, i) => ({ i, d: dr.d })).sort((a, b) => b.d - a.d).map(o => o.i);
+    if (idx.length < need) { lay.itemShortage = true; need = idx.length; }
+    if (!need) return;
+    // 이미 정해진 열쇠 서랍 + 입구에서 먼 서랍부터
+    const chosen = [];
+    if (lay.keyDrawer >= 0) chosen.push(lay.keyDrawer);
+    for (const i of idx) { if (chosen.length >= need) break; if (!chosen.includes(i)) chosen.push(i); }
+    chosen.forEach(i => { lay.drawers[i].loot = 'key'; });
+    lay.requiresKey = true;
+    lay.keyDrawer = chosen[0];
+    lay.keyDrawers = chosen;
+    lay.keysNeeded = chosen.length;
   }
   function standCandidates(lay) {
     const L = lay.frontD;
@@ -1136,6 +1172,8 @@
     });
     if (lay.requiresKey) {
       if (lay.keyDrawer < 0 || !lay.drawers[lay.keyDrawer] || lay.drawers[lay.keyDrawer].loot !== 'key') reasons.push('key missing');
+      if (lay.drawers.filter(dr => dr.loot === 'key').length < (lay.keysNeeded || 1)) reasons.push('not enough item drawers');
+      if (lay.itemShortage) reasons.push('season item drawers missing');
       if (lay.chasm) reasons.push('key room must not contain chasm');
     }
     if (lay.chasm && (lay.closets.length || lay.drawers.length)) reasons.push('bridge room has closet/drawer');
@@ -1261,7 +1299,7 @@
   };
 
   const api = {
-    CORE_VERSION, ROOM_H, PLAYER_R, WALL_T, DOOR_HALF, INTERACT, ARCH_LABELS,
+    CORE_VERSION, setSeason, getSeason, ROOM_H, PLAYER_R, WALL_T, DOOR_HALF, INTERACT, ARCH_LABELS,
     hashStr, makeRng, newSeed, planStage, stageConfig, buildLayout, validateLayout, generateRoom,
     pointBlocked, resolvePoint, moveCircle, makeGrid, bfs, findPath, nearestFree, rectActive, footprints, SaveManager
   };
