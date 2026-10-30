@@ -184,3 +184,39 @@ ck('77.5', '77.5', true); ck('1/3', '0.33', false);
 if (failures) { console.log(`FAILED: ${failures}`); process.exit(1); }
 console.log('type coverage:', JSON.stringify(typeCount));
 console.log(`PASS: math bank verified in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+
+// ---------- 8) 옷장 걸쇠(러쉬)·심장박동 문제: 글만 보고 풀 수 있고, 보기 3개가 서로 다르고, 정답이 맞는지 ----------
+(function defenseCheck() {
+  const parse = s => { s = String(s).replace(/\s*(개|cm²|cm)$/, ''); const rr = s.match(/^(\d+) : (\d+)$/); if (rr) return +rr[1] * 1000 + +rr[2]; const m = s.match(/^(\d+)\/(\d+)$/); if (m) return +m[1] / +m[2]; return parseFloat(s); };
+  const evalSide = s => { const m = s.match(/^(\d+)\/(\d+)$/); return m ? +m[1] / +m[2] : parseFloat(s); };
+  let n = 0, checked = 0;
+  for (const u of [1, 2, 3, 4, 5, 6]) {
+    const d = new B.Deck([u], 900 + u);
+    const qs = new Set();
+    for (let i = 0; i < 400; i++) {
+      const p = d.drawDefense(); n++;
+      qs.add(p.q);
+      if (p.diagram) fail('defense has diagram (unsolvable in latch popup): ' + p.q);
+      if (!p.q.startsWith('[')) fail('defense missing unit label ' + p.q);
+      if (/위에서 본 모양에 쌓은|그림|\?/.test(p.q)) fail('defense refers to a figure: ' + p.q);
+      if (p.q.length > 90) fail('defense too long: ' + p.q);
+      if (p.choices.length !== 3 || new Set(p.choices).size !== 3 || !p.choices.includes(p.a)) fail('defense choices ' + JSON.stringify(p));
+      const nums = p.choices.map(parse);
+      if (nums.every(Number.isFinite) && new Set(nums.map(v => v.toFixed(9))).size !== 3) fail('defense equivalent choices ' + JSON.stringify(p));
+      if (p.unit !== u) fail('defense from unselected unit ' + u + ': ' + p.q);
+      // 독립 재계산: "A ÷ B = □"
+      const m = p.q.match(/\] ([\d./]+) ÷ ([\d./]+) = □$/);
+      if (m) { checked++; const v = evalSide(m[1]) / evalSide(m[2]); if (Math.abs(v - parse(p.a)) > 1e-9) fail('defense wrong answer ' + p.q + ' -> ' + p.a); }
+      const pr = p.q.match(/\] (\d+|□) : (\d+|□) = (\d+|□) : (\d+|□)$/);
+      if (pr) { checked++; const t = pr.slice(1).map(x => x === '□' ? parse(p.a) : +x); if (t[0] * t[3] !== t[1] * t[2]) fail('defense proportion wrong ' + p.q + ' -> ' + p.a); }
+      const cu = p.q.match(/가로 (\d+)개, 세로 (\d+)개로 (\d+)층을 쌓은/);
+      if (cu) { checked++; if (+cu[1] * +cu[2] * +cu[3] !== parse(p.a)) fail('defense cuboid wrong ' + p.q); }
+      const ci = p.q.match(/(지름|반지름) (\d+) cm인 원의 (원주|넓이)는 □ cm²? \(원주율 ([\d.]+)\)/);
+      if (ci) { checked++; const r = ci[1] === '지름' ? +ci[2] / 2 : +ci[2], pi = +ci[4]; const v = ci[3] === '원주' ? 2 * r * pi : r * r * pi; if (Math.abs(v - parse(p.a)) > 1e-6) fail('defense circle wrong ' + p.q + ' -> ' + p.a); }
+    }
+    if (qs.size < 25) fail('defense variety too small for unit ' + u + ': ' + qs.size);
+    console.log(`defense unit ${u}: ${qs.size} different questions`);
+  }
+  console.log(`defense: ${n} drawn, ${checked} independently recomputed`);
+  if (failures) { console.log('FAILED', failures); process.exit(1); } else console.log('PASS: closet-latch / heartbeat questions solvable without figures, 3 distinct choices, answers verified');
+})();

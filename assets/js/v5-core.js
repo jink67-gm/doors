@@ -66,7 +66,9 @@
   // ---------------------------------------------------------------------------
   // Stage plan (event schedule) — built BEFORE any room
   // ---------------------------------------------------------------------------
-  const FILLERS = ['guest', 'storage', 'grandHall', 'lCorridor', 'uCorridor', 'shortcutHall', 'secretWing'];
+  // V5.2: 일자형 방이 줄어들도록 지그재그(zigzag)·엇갈린 벽(slalom)을 추가하고 두 번씩 넣어 자주 나오게 함
+  // 미로형 객실층(maze)은 3배, 지그재그·엇갈린 벽은 1배 → 일자형 방이 드물게 나옴
+  const FILLERS = ['guest', 'storage', 'grandHall', 'lCorridor', 'uCorridor', 'shortcutHall', 'secretWing', 'zigzag', 'slalom', 'maze', 'maze', 'maze', 'maze'];
   const MEDIUM = ['dupe', 'bridge', 'keySearch'];
   const HEAVY = ['library', 'seek'];
   const SPECIAL = new Set(MEDIUM.concat(HEAVY));
@@ -74,9 +76,10 @@
     guest: '🛏️ 객실 구역', storage: '📦 화물 창고', grandHall: '🏛️ 중앙 장치 홀', lCorridor: '↪️ ㄱ자 굴절 복도',
     uCorridor: '🔀 ㄷ자 굽은 복도', shortcutHall: '🕳️ 지름길 · 우회로', secretWing: '🕯️ 비밀방이 있는 별관',
     darkRoom: '🌑 암흑 구역', dupe: '🚪 갈림길 구역', bridge: '🌉 끊어진 다리 구역', keySearch: '🗝️ 열쇠 탐색 곁방',
-    seek: '👁️ 긴 복도 추격', library: '📚 고대 도서관'
+    seek: '👁️ 긴 복도 추격', library: '📚 고대 도서관',
+    zigzag: '〰️ 지그재그 복도', slalom: '🧱 엇갈린 벽 홀', maze: '🧭 미로 객실층'
   };
-  const RUSH_ARCHS = new Set(['guest', 'storage', 'grandHall', 'lCorridor', 'uCorridor', 'shortcutHall', 'secretWing', 'darkRoom', 'keySearch']);
+  const RUSH_ARCHS = new Set(['guest', 'storage', 'grandHall', 'lCorridor', 'uCorridor', 'shortcutHall', 'secretWing', 'darkRoom', 'keySearch', 'zigzag', 'slalom', 'maze']);
 
   function stageConfig(N) {
     const mid = Math.max(4, Math.round(N / 2));
@@ -146,6 +149,15 @@
           f = pool[pi++]; tries++;
         } while ((f === arch[d - 1] || f === arch[d + 1] || f === arch[d - 2]) && tries < 20);
         arch[d] = f;
+      }
+      // V5.2: 미로 방 최소 개수 보장 (10문 1개, 20문 3개, 30문 5개)
+      const wantMaze = Math.max(1, Math.round(N / 6));
+      let haveMaze = arch.filter(a => a === 'maze').length;
+      for (const d of rng.shuffle(Array.from({ length: N - 1 }, (_, i) => i + 2))) {
+        if (haveMaze >= wantMaze) break;
+        if (!FILLERS.includes(arch[d]) || arch[d] === 'maze') continue;
+        if (arch[d - 1] === 'maze' || arch[d + 1] === 'maze') continue;
+        arch[d] = 'maze'; haveMaze++;
       }
       // monster events
       const plan = [null];
@@ -311,6 +323,8 @@
     if (!fitsFree(lay, { shape: 'rect', o: p.foot }, 0.35)) return null;
     lay.props.push(p); return p;
   }
+  // 단말기 앞에 서서 E를 눌렀는데 옷장이 먼저 열리지 않도록, 단말기 접근점과 옷장 사이 거리를 3.2 m 이상 둔다 (V5.2)
+  function nearCloset(lay, x, d) { return (lay.closets || []).some(c => Math.hypot(c.x - x, c.d - d) < 3.2 || Math.hypot(c.access.x - x, c.access.d - d) < 2.2); }
   function placeTerminal(lay, mode, candidates) {
     if (mode === 'keypad') {
       const W = lay.W;
@@ -318,7 +332,7 @@
         const kx = lay.exitX + s * 1.85;
         if (Math.abs(kx) > W / 2 - 0.6) continue;
         lay.terminal = { mode: 'keypad', x: kx, d: lay.frontD, access: { x: kx, d: lay.frontD - 0.9 }, foot: null };
-        if (!pointBlocked(lay, kx, lay.frontD - 0.9, PLAYER_R, { crouch: true })) return lay.terminal;
+        if (!pointBlocked(lay, kx, lay.frontD - 0.9, PLAYER_R, { crouch: true }) && !nearCloset(lay, kx, lay.frontD - 0.9)) return lay.terminal;
       }
       lay.terminal = null;
       return null;
@@ -326,6 +340,7 @@
     for (const c of candidates) {
       const t = { mode: 'stand', x: c.x, d: c.d, access: { x: c.x, d: c.d - 1.0 }, foot: circle(c.x, c.d, 0.5, 'terminal') };
       if (!fitsFree(lay, { shape: 'circle', o: t.foot }, 0.4)) continue;
+      if (nearCloset(lay, t.access.x, t.access.d)) continue;
       lay.terminal = t;
       if (pointBlocked(lay, t.access.x, t.access.d, PLAYER_R, { crouch: true })) { lay.terminal = null; continue; }
       return t;
@@ -463,6 +478,133 @@
     placeDrawer(lay, s, [0.5, 0.45].map(f => f * lay.L), 'random');
     lay.notes.push('ㄷ자: 칸막이 두 개로 지그재그 동선');
   };
+  // 🧭 미로 객실층: 3×3 작은 방들이 문틀 통로로 연결된 구조 (V5.2)
+  //  - 무작위 신장 트리(막다른 방 생김) + 고리 1개(되돌아가기 쉬움) → 길을 잃어도 금방 다시 찾음
+  //  - 연결되지 않은 벽 일부에는 '잠긴 문'(열리지 않음)을 달아 "이 문은 막혀 있네" 경험
+  //  - 출구는 주로 왼쪽/오른쪽 끝 방 → 옆방을 거쳐야 탈출
+  //  - lay.maze.signs: 정답 경로 위 통로 (게임에서 난이도에 따라 '출구' 표지판으로 표시)
+  function buildMaze(lay, rng, opts) {
+    opts = opts || {};
+    const W = lay.W, L = lay.L, C = 3, Rn = 3, cw = W / C, cl = L / Rn;
+    const id = (c, r) => r * C + c;
+    const edges = new Map();               // key "a-b" (a<b) → {open}
+    const ek = (a, b) => a < b ? a + '-' + b : b + '-' + a;
+    const nb = (c, r) => [[c - 1, r], [c + 1, r], [c, r - 1], [c, r + 1]].filter(([x, y]) => x >= 0 && x < C && y >= 0 && y < Rn);
+    for (let r = 0; r < Rn; r++) for (let c = 0; c < C; c++) nb(c, r).forEach(([x, y]) => edges.set(ek(id(c, r), id(x, y)), { open: false }));
+    // DFS 신장 트리 (입구 = 아래 가운데 방)
+    const seen = new Set([id(1, 0)]), stack = [[1, 0]];
+    while (stack.length) {
+      const [c, r] = stack[stack.length - 1];
+      const opts2 = rng.shuffle(nb(c, r).filter(([x, y]) => !seen.has(id(x, y))));
+      if (!opts2.length) { stack.pop(); continue; }
+      const [x, y] = opts2[0];
+      edges.get(ek(id(c, r), id(x, y))).open = true;
+      seen.add(id(x, y)); stack.push([x, y]);
+    }
+    // 고리 1개 추가 (학생이 너무 헤매지 않게)
+    const closed = [...edges.entries()].filter(([, e]) => !e.open);
+    if (closed.length) rng.pick(closed)[1].open = true;
+    // 출구 방: 80% 왼쪽/오른쪽 위 방
+    const exC = rng.chance(0.8) ? rng.pick([0, 2]) : 1;
+    lay.exitX = exC === 1 ? 0 : (exC - 1) * Math.min(cw, W / 2 - 3.9);
+    // 벽 만들기
+    const openings = [], fakeDoors = [];
+    const closedList = [];
+    for (const [key, e] of edges) {
+      const [a, b] = key.split('-').map(Number);
+      const ca = a % C, ra = Math.floor(a / C), cb = b % C, rb = Math.floor(b / C);
+      const gapW = 2.4;
+      if (ra === rb) {                      // 좌우 이웃 → 세로 벽 (x 고정)
+        const x = -W / 2 + Math.max(ca, cb) * cw, d0 = ra * cl, d1 = (ra + 1) * cl;
+        const gc = rng.range(d0 + 0.9 + gapW / 2, d1 - 0.9 - gapW / 2);
+        wallSegmentsZ(lay, x, d0, d1, e.open ? [{ a: gc - gapW / 2, b: gc + gapW / 2 }] : [], 'partition');
+        if (e.open) openings.push({ x, d: gc, axis: 'z', w: gapW, cells: [a, b] });
+        else closedList.push({ x, d: (d0 + d1) / 2, axis: 'z' });
+      } else {                               // 앞뒤 이웃 → 가로 벽 (d 고정)
+        const d = Math.max(ra, rb) * cl, x0 = -W / 2 + ca * cw, x1 = x0 + cw;
+        const gc = rng.range(x0 + 0.9 + gapW / 2, x1 - 0.9 - gapW / 2);
+        wallSegmentsX(lay, d, x0, x1, e.open ? [{ a: gc - gapW / 2, b: gc + gapW / 2 }] : [], 'partition');
+        if (e.open) openings.push({ x: gc, d, axis: 'x', w: gapW, cells: [a, b] });
+        else closedList.push({ x: (x0 + x1) / 2, d, axis: 'x' });
+      }
+    }
+    rng.shuffle(closedList).slice(0, 2).forEach(f => fakeDoors.push(f));
+    // 입구 → 출구 최단 경로 (방 단위 BFS)
+    const start = id(1, 0), goal = id(exC, 2), prev = new Map([[start, -1]]), q = [start];
+    while (q.length) { const cur = q.shift(); if (cur === goal) break;
+      for (const [key, e] of edges) { if (!e.open) continue; const [a, b] = key.split('-').map(Number); const nx = a === cur ? b : (b === cur ? a : -1); if (nx < 0 || prev.has(nx)) continue; prev.set(nx, cur); q.push(nx); } }
+    const pathCells = []; for (let v = goal; v !== -1 && v !== undefined; v = prev.get(v)) pathCells.unshift(v);
+    const signs = [];
+    for (let i = 0; i + 1 < pathCells.length; i++) {
+      const a = pathCells[i], b = pathCells[i + 1];
+      const op = openings.find(o => (o.cells[0] === a && o.cells[1] === b) || (o.cells[0] === b && o.cells[1] === a));
+      if (!op) continue;
+      // 표지판은 '지금 있는 방(a)' 쪽 벽면에 붙인다
+      const ac = a % C, ar = Math.floor(a / C);
+      const acx = -W / 2 + (ac + 0.5) * cw, acd = (ar + 0.5) * cl;
+      signs.push({ x: op.x, d: op.d, axis: op.axis, w: op.w, face: op.axis === 'z' ? Math.sign(acx - op.x) : Math.sign(acd - op.d) });
+    }
+    lay.maze = { cols: C, rows: Rn, cw, cl, openings, fakeDoors, signs, exitCell: [exC, 2], pathLen: pathCells.length };
+    // 가구: 바깥 왼쪽·오른쪽 벽의 각 줄에 옷장(숨을 곳), 서랍, 가운데 방엔 소품
+    for (let r = 0; r < Rn; r++) {
+      const dm = (r + 0.5) * cl;
+      const order = rng.chance(0.5) ? [1, -1] : [-1, 1];
+      placeCloset(lay, order[0], [dm, dm - 1.2, dm + 1.2]);
+      if (r !== 1 || rng.chance(0.5)) placeCloset(lay, order[1], [dm + 1.0, dm - 1.0, dm]);
+      if (!opts.noRandomDrawers) placeDrawer(lay, order[1], [dm - 2.2, dm + 2.2, dm - 1.8], 'random');
+    }
+    placeProp(lay, 'sideTable', rng.range(-1.6, 1.6), cl * 1.5 + rng.range(-1, 1), 0.62);
+    placeProp(lay, 'lamp', rng.range(-2, 2), cl * 2.5 + rng.range(-1.2, 0.2), 0.4);
+    lay.notes.push('미로: 3×3 방, 막다른 방·잠긴 문, 출구는 ' + ['왼쪽', '가운데', '오른쪽'][exC] + ' 끝 방');
+  }
+  BUILD.maze = function (lay, rng) { buildMaze(lay, rng); };
+  BUILD.zigzag = function (lay, rng) {
+    // 〰️ 칸막이 3개가 좌우 번갈아 열려 있어 S자로 세 번 꺾어 가는 복도
+    const s = rng.sign(), W = lay.W, L = lay.L, gap = 2.9;
+    const ds = [0.24, 0.48, 0.72].map(f => L * (f + rng.range(-0.015, 0.015)));
+    ds.forEach((d, i) => {
+      const side = (i % 2 === 0) ? s : -s;            // 이 칸막이의 열린 쪽
+      wallSegmentsX(lay, d, -W / 2, W / 2, [side > 0 ? { a: W / 2 - gap, b: W / 2 } : { a: -W / 2, b: -W / 2 + gap }], 'partition');
+    });
+    lay.exitX = 0;
+    const lanes = [[0, ds[0]], [ds[0], ds[1]], [ds[1], ds[2]], [ds[2], L]];
+    const mid = k => (lanes[k][0] + lanes[k][1]) / 2;
+    // 칸(레인)마다 옷장 1개 → 어느 칸에서 러쉬 경고가 들려도 가까운 곳에 숨을 수 있음
+    placeCloset(lay, -s, [mid(0), mid(0) + 0.5, mid(0) - 0.5]);
+    placeCloset(lay, -s, [mid(1), mid(1) - 0.6, mid(1) + 0.6]) || placeCloset(lay, s, [mid(1), mid(1) - 0.6]);
+    placeCloset(lay, s, [mid(2), mid(2) - 0.6, mid(2) + 0.6]) || placeCloset(lay, -s, [mid(2), mid(2) + 0.6]);
+    placeCloset(lay, -s, [mid(3) - 0.8, mid(3), mid(3) + 0.8]);
+    placeDrawer(lay, s, [mid(0), mid(0) - 0.6], 'random');
+    placeDrawer(lay, s, [mid(3) - 0.5, mid(3) + 0.5], 'random');
+    // 막힌 모서리마다 작은 소품 (그냥 빈 벽이 아니라 공간이 되게)
+    placeProp(lay, 'lamp', s * (W / 2 - 1.1), mid(1), 0.4);
+    placeProp(lay, 'sideTable', -s * (W / 2 - 1.5), mid(2), 0.62);
+    const crate = rect(rng.range(-1.2, 1.2), mid(2) + rng.range(-0.4, 0.4), 0.7, 0.7, 'crate', { y1: 1.4 });
+    if (rng.chance(0.6) && fitsFree(lay, { shape: 'rect', o: crate }, 0.6)) lay.rects.push(crate);
+    lay.notes.push('지그재그: 칸막이 3개를 S자로 세 번 꺾어 통과');
+  };
+  BUILD.slalom = function (lay, rng) {
+    // 🧱 양쪽 벽에서 번갈아 튀어나온 벽 4개 사이를 이리저리 돌아가는 홀
+    const s = rng.sign(), W = lay.W, L = lay.L;
+    const reach = W * rng.range(0.58, 0.64);
+    const ds = [0.2, 0.38, 0.56, 0.74].map(f => L * f);
+    ds.forEach((d, i) => {
+      const from = (i % 2 === 0) ? s : -s;              // 벽이 붙어 있는 쪽
+      const x0 = from > 0 ? W / 2 - reach : -W / 2, x1 = from > 0 ? W / 2 : -W / 2 + reach;
+      wallSegmentsX(lay, d, x0, x1, [], 'partition');
+    });
+    lay.exitX = 0;
+    const between = k => (ds[k] + ds[k + 1]) / 2;
+    // 벽이 붙은 쪽 구석(막힌 곳)에 옷장 → 숨으러 들어가는 공간
+    placeCloset(lay, s, [between(0), between(0) + 0.5, between(0) - 0.5]);
+    placeCloset(lay, -s, [between(1), between(1) + 0.5]);
+    placeCloset(lay, s, [between(2), between(2) - 0.5, (ds[3] + L) / 2]);
+    placeDrawer(lay, -s, [ds[0] / 2, ds[0] / 2 + 0.6], 'random');
+    placeDrawer(lay, -s, [(ds[3] + L) / 2, (ds[3] + L) / 2 + 0.6], 'random');
+    placeProp(lay, 'lamp', -s * (W / 2 - 1.1), between(0), 0.4);
+    placeProp(lay, 'sideTable', s * (W / 2 - 1.5), between(1), 0.62);
+    lay.notes.push('엇갈린 벽: 양쪽에서 번갈아 나온 벽 4개를 돌아가며 통과');
+  };
   BUILD.shortcutHall = function (lay, rng) {
     // cross partition: a low crawl hole (shortcut, crouch) in the middle + an open detour at one side
     const s = rng.sign();
@@ -495,6 +637,17 @@
     lay.notes.push('좁은 틈으로 들어가는 비밀방');
   };
   BUILD.keySearch = function (lay, rng) {
+    if (rng.chance(0.65)) {
+      // 미로형 열쇠 찾기: 여러 방 서랍 중 하나에 열쇠 (입구에서 먼 방 우선)
+      buildMaze(lay, rng, { noRandomDrawers: true });
+      for (let r = 0; r < 3; r++) placeDrawer(lay, rng.sign(), [(r + 0.5) * lay.maze.cl - 2.0, (r + 0.5) * lay.maze.cl + 2.0, (r + 0.5) * lay.maze.cl], 'random');
+      lay.requiresKey = true;
+      const far = lay.drawers.map((dr, i) => ({ i, d: dr.d })).sort((a, b) => b.d - a.d);
+      lay.keyDrawer = far.length ? (far.length > 1 && rng.chance(0.5) ? far[1].i : far[0].i) : -1;
+      if (lay.keyDrawer >= 0) lay.drawers[lay.keyDrawer].loot = 'key';
+      lay.notes.push('미로형 열쇠 탐색');
+      return;
+    }
     const s = rng.sign();
     const W = lay.W;
     const ix = s * (W / 2 - 3.8);
@@ -603,8 +756,8 @@
 
   const DIMS = {
     guest: [12.5, 13.5, 18, 21], darkRoom: [13.5, 14.5, 20, 22], storage: [13, 14, 20, 22], grandHall: [16.5, 17.5, 22, 24],
-    lCorridor: [14, 14.5, 20, 22], uCorridor: [14, 14.5, 21, 23], shortcutHall: [15, 15.5, 20, 22], secretWing: [15.5, 16, 20, 22],
-    keySearch: [14.5, 15, 21, 23], dupe: [16, 16, 21, 22], bridge: [13, 13.5, 24, 25], seek: [9.5, 9.5, 44, 44], library: [18, 18, 28, 28]
+    lCorridor: [14, 14.5, 20, 22], uCorridor: [14, 14.5, 21, 23], zigzag: [13.5, 14.5, 24, 27], slalom: [13, 14, 22, 25], maze: [20.5, 22, 20.5, 22.5], shortcutHall: [15, 15.5, 20, 22], secretWing: [15.5, 16, 20, 22],
+    keySearch: [20.5, 22, 21, 23], dupe: [16, 16, 21, 22], bridge: [13, 13.5, 24, 25], seek: [9.5, 9.5, 44, 44], library: [18, 18, 28, 28]
   };
 
   function buildLayout(door, arch, seed, puzzle, attempt, safe, events) {
@@ -613,7 +766,7 @@
     const W = Math.round(rng.range(dm[0], dm[1]) * 10) / 10;
     const L = Math.round(rng.range(dm[2], dm[3]) * 10) / 10;
     const lay = newLayout(door, arch, W, L, rng);
-    if (!['dupe', 'lCorridor', 'uCorridor', 'seek', 'bridge'].includes(arch)) pickExitX(lay, rng);
+    if (!['dupe', 'lCorridor', 'uCorridor', 'zigzag', 'slalom', 'maze', 'seek', 'bridge'].includes(arch)) pickExitX(lay, rng);
     if (safe) {
       // guaranteed simple variant: only wall furniture
       if (arch === 'dupe') BUILD.dupe(lay, rng);
@@ -991,6 +1144,7 @@
       if (!reach({ x: lay.terminal.x, d: lay.terminal.mode === 'keypad' ? lay.frontD - 0.75 : lay.terminal.d }, INTERACT.terminal - 0.35)) reasons.push('terminal unreachable');
     } else if (lay.puzzleKind !== 'none' && lay.puzzleKind !== 'bridge' && lay.arch !== 'seek') reasons.push('terminal missing');
     if (lay.chasm && lay.terminal && lay.terminal.d > lay.chasm.d0) reasons.push('bridge terminal beyond chasm');
+    if (lay.terminal && lay.terminal.access && nearCloset(lay, lay.terminal.access.x, lay.terminal.access.d)) reasons.push('terminal too close to a closet (E would open the closet)');
     if (lay.dupeDoors) {
       lay.dupeDoors.forEach((dd, i) => { if (!reach({ x: dd.x, d: lay.frontD }, INTERACT.door - 0.4)) reasons.push('dupe door ' + i + ' unreachable'); });
       if (lay.dupeDoors.filter(x => x.correct).length !== 1) reasons.push('dupe must have exactly one correct door');

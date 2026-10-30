@@ -162,6 +162,10 @@ async def launch(viewport=(480, 300), mobile=False, dtcap=0.34):
     ctx = await b.new_context(viewport={'width': viewport[0], 'height': viewport[1]}, has_touch=mobile, is_mobile=mobile)
     pg = await ctx.new_page()
     await pg.route('**/fonts.googleapis.com/**', lambda r: r.abort())
+    # 그래픽카드 없는 테스트 환경: 게임 로직 테스트는 '가볍게' 그래픽으로 (화면 품질은 visual_tour.py에서 고품질로 따로 확인)
+    import os
+    if os.environ.get('MD_GFX', 'lite') == 'lite' and viewport[0] < 900:
+        await pg.add_init_script("try { if (!localStorage.getItem('mathDoorsGfx')) localStorage.setItem('mathDoorsGfx', 'lite'); } catch (e) {}")
     await pg.goto(BASE)
     await pg.wait_for_function("window.MathDoorsDebug && typeof activeRooms !== 'undefined' && isPlaying === false", timeout=20000)
     await pg.evaluate(f'window.__dtCap = {dtcap}')

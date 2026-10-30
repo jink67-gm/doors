@@ -41,6 +41,8 @@
     bridge: 'bridge_deploy', doorLocked: 'door_rattle_locked',
     heartbeat: 'ambient_heartbeat', pipeKnock: 'ambient_pipe_knock', hotelWhisper: 'ambient_hotel_whisper'
   };
+  // 효과음별 기본 음량 배율: 퍼즐 답 입력 버튼 '삑' 소리(keypad_press)가 다른 소리보다 커서 낮춤 (V5.2)
+  const EFFECT_GAIN = { key: 0.35 };
   // 표면별 발소리 파일: footstep_{surface}_{mode}_{NN}.mp3
   const SURFACES = ['carpet', 'wood', 'stone', 'metal'];
   const STEP_COUNT = { walk: 5, crouch: 3, run: 3 };
@@ -241,7 +243,7 @@
       if (now - last < (limits[type] || 65)) return;
       this.lastEffect.set(type, now);
       this.stats.sfx++;
-      const gain = clamp(volume, 0, 1.3);
+      const gain = clamp(volume * (EFFECT_GAIN[type] || 1), 0, 1.3);
       if (this.ctx) { this._playBuffer('sfx/' + name, gain, this.sfxBus, 1, now); return; }
       this._playHtml('sfx/' + name, gain);
     }

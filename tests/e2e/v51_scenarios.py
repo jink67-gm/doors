@@ -24,51 +24,68 @@ async def wait_for(g, pg, fn, n=250, step=100):
         await pg.wait_for_timeout(step)
     return None
 
+FIND = """(want) => { for (let seed = 1; seed < 400; seed++) { const P = MathDoorsCore.planStage(10, seed).rooms;
+  for (let n = 3; n <= 9; n++) { const r = P[n], nx = P[n + 1]; if (!r) continue;
+    const unsafeNext = !nx || ['seek', 'library', 'bridge'].includes(nx.arch);
+    if (want === 'carry' && r.events.rush && !unsafeNext && r.arch !== 'darkRoom') return [seed, n];
+    if (want === 'block' && r.events.rush && nx && nx.arch === 'library' && r.arch !== 'darkRoom') return [seed, n];
+    if (want === 'ambush' && r.events.ambush && r.arch !== 'darkRoom') return [seed, n];
+    if (want === 'dupe' && r.arch === 'dupe') return [seed, n]; } } return null; }"""
+
+async def find(g, want):
+    return await g.ev(FIND, want)
+
 async def rush_carry(g, pg):
-    await begin(g, pg, 11, 3)
+    seed, n = await find(g, 'carry'); g.log(f'carry seed={seed} door={n}')
+    await begin(g, pg, seed, n)
     # 예약된 러쉬를 잠시 보류하고 출구 앞까지 간 다음, 같은 러쉬 이벤트를 출구 앞에서 발생시킨다
-    await g.ev("() => { clearTimeout(rushSpawnTimerId); clearTimeout(screechSpawnTimerId); markRoomSolved(activeRooms[3]); }")
+    await g.ev(f"() => {{ clearTimeout(rushSpawnTimerId); clearTimeout(screechSpawnTimerId); markRoomSolved(activeRooms[{n}]); }}")
     t = await g.targets()
     await walk_safe(g, t['door']['x'], t['door']['d'] - 1.6, g.log, tol=0.6)
     await g.ev("triggerRushEvent()")
     st = await wait_for(g, pg, lambda s: s['rush']['warning'])
-    record('carry: rush warning starts in DOOR 3', st is not None)
+    record(f'carry: rush warning starts in DOOR {n}', st is not None)
     await g.walk_to(t['door']['x'], t['door']['d'] + 2.5, tol=0.8, timeout=8, crouch=False)
-    st = await wait_for(g, pg, lambda s: s['door'] == 4, n=40)
-    record('carry: escaped into DOOR 4 during the warning', st is not None)
+    st = await wait_for(g, pg, lambda s: s['door'] == n + 1, n=40)
+    record(f'carry: escaped into DOOR {n + 1} during the warning', st is not None)
     st = await g.state()
     record('carry: rush still coming after entering the next room', st['rush']['warning'] or st['rush']['active'], str(st['rush']))
-    swept = await g.ev("""() => new Promise(res => { let seen = false; const t0 = performance.now(); (function f(){ const r = activeRooms[4];
+    swept = await g.ev("""(nn) => new Promise(res => { let seen = false; const t0 = performance.now(); (function f(){ const r = activeRooms[nn];
         if (rushState.active && rushState.phase === 'SWEEPING' && rushState.z < r.zStart - 2 && rushState.z > r.zEnd) seen = true;
-        if (seen || performance.now() - t0 > 15000) res(seen); else requestAnimationFrame(f); })(); })""")
-    record('carry: rush sweeps through DOOR 4 (the room the player fled to)', swept)
+        if (seen || performance.now() - t0 > 15000) res(seen); else requestAnimationFrame(f); })(); })""", n + 1)
+    record(f'carry: rush sweeps through DOOR {n + 1} (the room the player fled to)', swept)
 
 async def rush_block(g, pg):
-    await begin(g, pg, 4, 4)
-    await g.ev("markRoomSolved(activeRooms[4])")
+    seed, n = await find(g, 'block'); g.log(f'block seed={seed} door={n}')
+    await begin(g, pg, seed, n)
+    await g.ev(f"() => {{ clearTimeout(rushSpawnTimerId); clearTimeout(screechSpawnTimerId); markRoomSolved(activeRooms[{n}]); }}")
+    t = await g.targets()
+    await walk_safe(g, t['door']['x'], t['door']['d'] - 1.6, g.log, tol=0.6)
+    await g.ev("triggerRushEvent()")
     st = await wait_for(g, pg, lambda s: s['rush']['warning'])
     t = await g.targets()
     await g.walk_to(t['door']['x'], t['door']['d'] + 2.5, tol=0.8, timeout=6, crouch=False)
     st = await g.state()
-    record('block: next room is the library (no closets) → door blocks during rush warning', st['door'] == 4 and (st['rush']['warning'] or st['rush']['active']), f"door={st['door']} rush={st['rush']}")
+    record('block: next room is the library (no closets) → door blocks during rush warning', st['door'] == n and (st['rush']['warning'] or st['rush']['active']), f"door={st['door']} rush={st['rush']}")
     h0 = st['hearts']
     ok = await hide_until_safe(g, g.log)
     st = await g.state()
-    record('block: player stays in DOOR 4 and survives the rush there (hid after being blocked)', ok and st['playing'] and st['door'] == 4, f"hearts {h0}→{st['hearts']}")
+    record(f'block: player stays in DOOR {n} and survives the rush there (hid after being blocked)', ok and st['playing'] and st['door'] == n, f"hearts {h0}→{st['hearts']}")
     await walk_safe(g, t['door']['x'], t['door']['d'] - 1.0, g.log, tol=0.6)
     await g.walk_to(t['door']['x'], t['door']['d'] + 2.5, tol=0.8, timeout=8, crouch=False)
-    st = await wait_for(g, pg, lambda s: s['door'] == 5, n=40)
+    st = await wait_for(g, pg, lambda s: s['door'] == n + 1, n=40)
     record('block: after the rush the door lets the player through', st is not None)
 
 async def ambush_hide(g, pg):
-    await begin(g, pg, 2, 4)
+    seed, n = await find(g, 'ambush'); g.log(f'ambush seed={seed} door={n}')
+    await begin(g, pg, seed, n)
     await g.ev("() => { clearTimeout(ambushSpawnTimerId); clearTimeout(screechSpawnTimerId); }")
     t = await g.targets(); pl = (await g.state())['player']
     c = min(t['closets'], key=lambda c: math.hypot(c['x'] - pl['x'], c['d'] - pl['d']))
     await walk_safe(g, c['x'], c['d'], g.log, tol=0.9)   # 옷장 앞에서 대기 → 경고가 들리면 숨는다
     await g.ev("triggerAmbushEvent()")
     st = await wait_for(g, pg, lambda s: s['ambush']['warning'] or s['ambush']['active'], n=400)
-    record('ambush: event starts in DOOR 4', st is not None)
+    record(f'ambush: event starts in DOOR {n}', st is not None)
     await g.key('KeyE')
     h0 = st['hearts']; ejected = 0; hide_seen = False; rehid = 0
     for i in range(900):
@@ -88,7 +105,8 @@ async def ambush_hide(g, pg):
     record('ambush: eject itself does no damage, re-hiding survives the whole ambush', st['playing'] and st['hearts'] == h0 and not any('하이드' in h['title'] for h in hits), f"hearts {h0}→{st['hearts']} hits={[h['title'] for h in hits]}")
 
 async def dupe_door(g, pg, hearts):
-    await begin(g, pg, 2, 6, hearts=hearts)
+    seed, n = await find(g, 'dupe')
+    await begin(g, pg, seed, n, hearts=hearts)
     t = await g.targets()
     if t['terminal']:
         await walk_safe(g, t['terminal']['x'], t['terminal']['d'], g.log, tol=0.6)

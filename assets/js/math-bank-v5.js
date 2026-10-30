@@ -717,32 +717,129 @@
     this.history.push(p.sig);
     return p;
   };
-  // closet latch defence: 3 choices, quick mental math, ONLY from selected units
+  // closet latch defence (V5.2): 그림 없이 글만 보고 10초 안에 암산으로 풀 수 있는 문제만.
+  // 선택한 단원에서만 출제, 보기 3개는 서로 값이 다르고(동치 분수 금지) 흔한 실수를 오답으로 사용.
+  function gcdI(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a || 1; }
+  function fr(n, d) { const g = gcdI(n, d); n /= g; d /= g; return d === 1 ? String(n) : n + '/' + d; }
+  function dec(tenths) { const v = tenths / 10; return Number.isInteger(v) ? String(v) : v.toFixed(1); }
+  function dec2(hund) { const v = hund / 100; return (Math.round(v * 100) / 100).toString(); }
+  function valOf(str) { const m = String(str).match(/^(\d+)\/(\d+)$/); if (m) return +m[1] / +m[2]; const r = String(str).match(/^(\d+) : (\d+)$/); if (r) return +r[1] * 1000 + +r[2]; return parseFloat(str); }
+  const DEF = {
+    1: [
+      rng => { const n = rng.pick([5, 7, 9, 11, 13]), b = rng.int(2, 4), k = rng.int(2, 4), a = b * k; if (a >= n) return null;
+        return { q: `${a}/${n} ÷ ${b}/${n} = □`, a: String(k), w: [fr(b, a), String(a - b)] }; },
+      rng => { const k = rng.int(2, 9), m = rng.int(2, 6);
+        return { q: `${k} ÷ 1/${m} = □`, a: String(k * m), w: [fr(k, m), String(k + m)] }; },
+      rng => { const b = rng.int(2, 4), c = rng.int(b + 1, 7), k = b * rng.int(2, 4); if (gcdI(b, c) !== 1) return null;
+        return { q: `${k} ÷ ${b}/${c} = □`, a: String(k / b * c), w: [fr(k * b, c), String(k / b)] }; },
+      rng => { const n = rng.pick([3, 5, 7]), a = rng.int(1, n - 1), k = rng.int(2, 4); if (gcdI(a, n) !== 1) return null;
+        return { q: `${a}/${n} ÷ ${k} = □`, a: fr(a, n * k), w: [fr(a * k, n), fr(n * k, a)] }; },
+      rng => { const m = rng.int(2, 5), b = rng.int(2, 9);
+        return { q: `1/${m} ÷ 1/${m * b} = □`, a: String(b), w: [fr(1, b), String(m * b)] }; }
+    ],
+    2: [
+      rng => { const d = rng.int(2, 9), q = rng.int(2, 9);
+        return { q: `${dec(d * q)} ÷ ${dec(d)} = □`, a: String(q), w: [dec(q), String(q * 10)] }; },
+      rng => { const k = rng.int(2, 9), d = rng.pick([2, 4, 5]); if ((k * 10) % d) return null;
+        return { q: `${k} ÷ ${dec(d)} = □`, a: String(k * 10 / d), w: [dec(k * 10 / d), String(k * 100 / d)] }; },
+      rng => { const d = rng.int(2, 9), q = rng.int(11, 19);
+        return { q: `${dec(d * q)} ÷ ${dec(d)} = □`, a: String(q), w: [dec(q), String(q * 10)] }; },
+      rng => { const d = rng.int(2, 9), q = rng.int(2, 9);
+        return { q: `${dec(d * q)} ÷ ${d} = □`, a: dec(q), w: [String(q), dec2(q)] }; },
+      rng => { const d = rng.pick([12, 15, 25]), q = rng.int(2, 6);
+        return { q: `${dec2(d * q)} ÷ ${dec2(d)} = □`, a: String(q), w: [dec(q), String(q * 10)] }; }
+    ],
+    3: [
+      rng => { const a = rng.int(2, 4), b = rng.int(2, 4), c = rng.int(2, 3);
+        return { q: `가로 ${a}개, 세로 ${b}개로 ${c}층을 쌓은 직육면체 모양의 쌓기나무는 모두 □개`, a: String(a * b * c), w: [String(a * b + c), String(a * b * (c - 1) || a + b + c)], unit: '개' }; },
+      rng => { const x = rng.int(4, 7), y = rng.int(2, x - 1), z = rng.int(1, y - 1);
+        return { q: `1층 ${x}개, 2층 ${y}개, 3층 ${z}개를 쌓았습니다. 쌓기나무는 모두 □개`, a: String(x + y + z), w: [String(x + y), String(x + y + z + 1)], unit: '개' }; },
+      rng => { const n = rng.int(2, 3);
+        return { q: `한 모서리에 ${n}개씩 놓아 정육면체 모양으로 쌓은 쌓기나무는 모두 □개`, a: String(n * n * n), w: [String(n * n), String(n * 3)], unit: '개' }; },
+      rng => { const k = rng.int(4, 8), m = rng.int(2, 3);
+        return { q: `위에서 본 모양이 ${k}칸이고 모든 칸에 ${m}층씩 쌓았습니다. 쌓기나무는 모두 □개`, a: String(k * m), w: [String(k + m), String(k)], unit: '개' }; },
+      rng => { const a = rng.int(2, 4), b = rng.int(2, 4), c = rng.int(2, 3);
+        return { q: `가로 ${a}개, 세로 ${b}개, ${c}층 직육면체 모양에서 맨 위층을 모두 빼면 남는 쌓기나무는 □개`, a: String(a * b * (c - 1)), w: [String(a * b * c), String(a * b)], unit: '개' }; }
+    ],
+    4: [
+      rng => { const a = rng.int(2, 9), b = rng.int(2, 9), k = rng.int(2, 5); if (a === b) return null;
+        return { q: `${a} : ${b} = ${a * k} : □`, a: String(b * k), w: [String(b + k), String(a * k)] }; },
+      rng => { const a = rng.int(2, 9), b = rng.int(2, 9), k = rng.int(2, 5); if (a === b) return null;
+        return { q: `${a} : □ = ${a * k} : ${b * k}`, a: String(b), w: [String(b * k), String(b + 1)] }; },
+      rng => { const p = rng.int(1, 4), q = rng.int(1, 4), u = rng.int(3, 9); if (p === q || gcdI(p, q) !== 1) return null; const t = (p + q) * u, front = rng.chance(0.5);
+        return { q: `${t}개를 ${p} : ${q}의 비로 나누면 ${front ? '앞' : '뒤'}의 몫은 □개`, a: String((front ? p : q) * u), w: [String((front ? q : p) * u), String(t / 2 === Math.floor(t / 2) && t / 2 !== p * u && t / 2 !== q * u ? t / 2 : (front ? p : q) * u + u)], unit: '개' }; },
+      rng => { const a = rng.int(2, 6), b = rng.int(2, 6), k = rng.int(2, 4); if (a === b || gcdI(a, b) !== 1) return null;
+        return { q: `${a * k} : ${b * k} → 가장 간단한 자연수의 비 □`, a: `${a} : ${b}`, w: [`${b} : ${a}`, `${a} : ${a + b}`] }; },
+      rng => { const a = rng.int(2, 6), b = rng.int(2, 6), k = rng.int(2, 4);
+        return { q: `비례식 ${a} : ${b} = ${a * k} : ${b * k}에서 외항의 곱은 □`, a: String(a * b * k), w: [String(a * b * k + a), String(a * a * k)] }; }
+    ],
+    5: [
+      rng => { const d = rng.int(3, 12);
+        return { q: `지름 ${d} cm인 원의 원주는 □ cm (원주율 3)`, a: String(d * 3), w: [String(d * 6), String(d * d * 3)], unit: 'cm' }; },
+      rng => { const r = rng.int(2, 9);
+        return { q: `반지름 ${r} cm인 원의 원주는 □ cm (원주율 3)`, a: String(r * 6), w: [String(r * 3), String(r * r * 3)], unit: 'cm' }; },
+      rng => { const r = rng.int(2, 7);
+        return { q: `반지름 ${r} cm인 원의 넓이는 □ cm² (원주율 3)`, a: String(r * r * 3), w: [String(r * 6), String(r * r * 12)], unit: 'cm²' }; },
+      rng => { const d = rng.int(3, 12);
+        return { q: `원주가 ${d * 3} cm인 원의 지름은 □ cm (원주율 3)`, a: String(d), w: [String(d * 2), String(d * 3 * 3)], unit: 'cm' }; },
+      rng => { const d = rng.pick([1, 2, 10, 20]);
+        return { q: `지름 ${d} cm인 원의 원주는 □ cm (원주율 3.14)`, a: dec2(d * 314), w: [dec2(d * 628), String(d * 3)], unit: 'cm' }; },
+      rng => { const r = rng.pick([1, 10]);
+        return { q: `반지름 ${r} cm인 원의 넓이는 □ cm² (원주율 3.14)`, a: dec2(r * r * 314), w: [dec2(r * 628), dec2(r * r * 314 * 4)], unit: 'cm²' }; }
+    ],
+    6: [
+      rng => { const a = rng.int(3, 9), b = rng.int(3, 9); if (a === b || a * 2 === b) return null;
+        return { q: `가로 ${a} cm, 세로 ${b} cm인 직사각형을 세로를 축으로 한 바퀴 돌린 원기둥의 밑면 지름은 □ cm`, a: String(a * 2), w: [String(a), String(b)], unit: 'cm' }; },
+      rng => { const a = rng.int(3, 9), b = rng.int(3, 9); if (a === b || a * 2 === b) return null;
+        return { q: `가로 ${a} cm, 세로 ${b} cm인 직사각형을 세로를 축으로 한 바퀴 돌린 원기둥의 높이는 □ cm`, a: String(b), w: [String(a), String(a * 2)], unit: 'cm' }; },
+      rng => { const a = rng.int(3, 9), h = rng.int(4, 12); if (a === h || a * 2 === h) return null;
+        return { q: `밑변 ${a} cm, 높이 ${h} cm인 직각삼각형을 높이를 축으로 돌린 원뿔의 밑면 반지름은 □ cm`, a: String(a), w: [String(h), String(a * 2)], unit: 'cm' }; },
+      rng => { const d = rng.int(4, 15) * 2;
+        return { q: `지름 ${d} cm인 반원을 지름을 축으로 돌려 만든 구의 반지름은 □ cm`, a: String(d / 2), w: [String(d), String(d * 2)], unit: 'cm' }; },
+      rng => { const r = rng.int(2, 8);
+        return { q: `밑면 반지름 ${r} cm인 원기둥의 전개도에서 옆면 가로의 길이는 □ cm (원주율 3)`, a: String(r * 6), w: [String(r * 3), String(r * r * 3)], unit: 'cm' }; },
+      rng => rng.pick([
+        { q: '원기둥의 밑면은 □개', a: '2', w: ['1', '3'], unit: '개' },
+        { q: '원뿔의 꼭짓점은 □개', a: '1', w: ['0', '2'], unit: '개' },
+        { q: '원뿔의 밑면은 □개', a: '1', w: ['2', '0'], unit: '개' },
+        { q: '원기둥의 옆면을 펼치면 □ 모양', a: '직사각형', w: ['원', '삼각형'] },
+        { q: '구를 어느 방향에서 보아도 □ 모양', a: '원', w: ['삼각형', '직사각형'] }])
+    ]
+  };
+  function makeDefense(unit, rng) {
+    const gens = DEF[unit]; if (!gens) return null;
+    const raw = rng.pick(gens)(rng);
+    if (!raw) return null;
+    const all = [raw.a].concat(raw.w);
+    // 보기 값이 서로 달라야 함 (2/4와 1/2 같은 동치, 소수/정수 같은 값 금지)
+    const vals = all.map(valOf);
+    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
+      if (all[i] === all[j]) return null;
+      if (Number.isFinite(vals[i]) && Number.isFinite(vals[j]) && Math.abs(vals[i] - vals[j]) < 1e-9) return null;
+    }
+    if (all.some(x => x === '0' && raw.a !== '0' && !/꼭짓점|밑면/.test(raw.q))) return null;
+    const u = raw.unit ? ' ' + raw.unit : '';
+    return { q: raw.q, a: raw.a + u, choices: rng.shuffle(all).map(x => x + u) };
+  }
   Deck.prototype.drawDefense = function () {
     const rng = makeRng('def', this.seed, this.defCount++);
-    for (let t = 0; t < 200; t++) {
+    if (!this.defRecent) this.defRecent = [];
+    let best = null;
+    for (let t = 0; t < 300; t++) {
       const unit = rng.pick(this.units);
-      let core = null;
-      if (unit === 1) core = U1.core(rng, rng.pick([0, 2]));
-      else if (unit === 2) core = U2.core(rng, rng.pick([0, 3]));
-      else if (unit === 3) core = rng.chance(0.5) ? U3.core(rng, 0) : null;
-      else if (unit === 4) core = U4.core(rng, rng.pick([0, 1]));
-      else if (unit === 5) core = U5.core(rng, rng.pick([0, 2]));
-      else core = U6.core(rng, rng.pick([1, 2, 3]));
-      if (unit === 3 && !core) {
-        const a = rng.int(2, 4), b = rng.int(2, 3), c = rng.int(2, 3);
-        core = { unit: 3, gen: 'u3_def', params: [a, b, c], q: `가로 ${a} · 세로 ${b} · ${c}층 직육면체 쌓기나무는 □개`, ans: R(a * b * c, 1), unitLabel: '개', distract: [R(a * b + c, 1), R(a + b + c, 1)] };
-      }
-      if (!core) continue;
-      if (unit === 5 && core.ans && !isInt(core.ans) && !terminates(core.ans)) continue;
-      const p = asNumeric(core, { type: 'E', rng });
-      if (this.defUsed.has(p.sig) || validateProblem(p).length) continue;
-      if (core.diagram && unit === 3) { p.q = core.q; }
-      this.defUsed.add(p.sig);
-      return { id: p.sig, unit, q: '[' + UNIT_NAMES[unit].replace(/^\d단원\. /, '') + '] ' + p.q.replace(/\s*\(단위: [^)]+\)$/, ''), choices: p.dupeChoices.map(c => c + (core.unitLabel && core.unitLabel !== '병' ? ' ' + core.unitLabel : '')), a: p.a + (core.unitLabel && core.unitLabel !== '병' ? ' ' + core.unitLabel : ''), diagram: core.diagram || null };
+      const d = makeDefense(unit, rng);
+      if (!d) continue;
+      if (this.defRecent.includes(d.q)) continue;   // 최근 40문제와 같은 문제 금지
+      best = { id: 'def_' + hashSig(d.q), unit, q: '[' + UNIT_NAMES[unit].replace(/^\d단원\. /, '') + '] ' + d.q, choices: d.choices, a: d.a, diagram: null };
+      this.defRecent.push(d.q); if (this.defRecent.length > 40) this.defRecent.shift();
+      return best;
     }
+    const unit = this.units[0];
+    for (let t = 0; t < 50; t++) { const d = makeDefense(unit, rng); if (d) return { id: 'def_fb', unit, q: '[' + UNIT_NAMES[unit].replace(/^\d단원\. /, '') + '] ' + d.q, choices: d.choices, a: d.a, diagram: null }; }
     return { id: 'def_fallback', unit: 1, q: '[분수의 나눗셈] 6 ÷ 3/4 = □', choices: ['6', '8', '9'], a: '8' };
   };
+  // 테스트용 노출
+  Deck.makeDefense = makeDefense;
   function hashSig(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
 
   // ----------------------------------------------------------------- diagrams (SVG strings)

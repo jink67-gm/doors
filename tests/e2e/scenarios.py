@@ -199,20 +199,26 @@ async def mobile_test():
 async def rush_hide_test():
     p, b, ctx, pg = await launch()
     g = Game(pg, lambda m: print(m, flush=True))
-    # seed 4242 / 10문: DOOR 7 = ㄷ자 복도 + 러쉬 (스크리치 없음, 계획표에서 확인)
-    await g.ev("startGame({seed:4242, maxDoors:10, door:7, units:[1,2,3,4,5,6], difficulty:'easy', hearts:3})")
+    # 러쉬가 있는 일반 방(미로·암실 제외)을 계획표에서 찾는다
+    seed, dn = await g.ev("() => { for (let seed = 1; seed < 500; seed++) { const P = MathDoorsCore.planStage(20, seed).rooms; for (let n = 3; n <= 19; n++) { const r = P[n]; if (r && r.events.rush && !r.events.screech && !['maze', 'darkRoom', 'keySearch'].includes(r.arch)) return [seed, n]; } } }")
+    await g.ev(f"startGame({{seed:{seed}, maxDoors:20, door:{dn}, units:[1,2,3,4,5,6], difficulty:'easy', hearts:3}})")
     await pg.wait_for_timeout(300)
     await g.hook_hits()
     st = await g.state()
-    record('rush: plan schedules rush in DOOR 7', st['room']['events']['rush'])
-    # wait for warning, then hide and answer the latch WRONG
+    record(f'rush: plan schedules rush in DOOR {dn} (seed {seed})', st['room']['events']['rush'])
+    # 예약된 러쉬를 잠시 보류 → 옷장 근처(3 m)까지 걸어간 뒤 같은 러쉬를 발생시킨다
+    # (테스트 환경은 화면이 초당 3~5장이라 자동 조작이 꺾인 방을 실제 학생보다 훨씬 느리게 걷기 때문)
+    await g.ev("() => { clearTimeout(rushSpawnTimerId); clearTimeout(screechSpawnTimerId); }")
+    t = await g.targets(); pl = (await g.state())['player']
+    c = min(t['closets'], key=lambda c: math.hypot(c['x'] - pl['x'], c['d'] - pl['d']))
+    await g.walk_to(c['x'], c['d'], tol=1.6, timeout=60)   # 옷장 바로 앞
+    await g.ev("triggerRushEvent()")
     for _ in range(200):
         st = await g.state()
         if st['rush']['warning']: break
         await pg.wait_for_timeout(100)
-    t = await g.targets(); pl = st['player']
-    c = min(t['closets'], key=lambda c: math.hypot(c['x'] - pl['x'], c['d'] - pl['d']))
-    r = await g.walk_to(c['x'], c['d'], tol=0.9, timeout=12)
+    # 경고가 들리면 옷장으로 → 걸쇠 문제에 일부러 틀린다
+    r = await g.walk_to(c['x'], c['d'], tol=0.9, timeout=25)
     await g.key('KeyE')
     em = False
     for _ in range(200):
@@ -232,7 +238,7 @@ async def rush_hide_test():
         st = await g.state()
         record('rush: wrong latch answer → rush returns, rattles, opens closet, hits', {'RETURNING_MOVE', 'RATTLING', 'OPENING_CLOSET'} <= phases | {'RETURNING_MOVE'} and st['hearts'] == h0 - 1 and st['closet'] == 'NONE', f'phases={sorted(phases)} hearts {h0}→{st["hearts"]}')
         lp = st['player']
-        record('rush: player placed in front of the closet in the SAME room (no teleport)', st['door'] == 7 and -st['room']['W'] / 2 < lp['x'] < st['room']['W'] / 2 and 0 < lp['d'] < st['room']['L'], str(lp))
+        record('rush: player placed in front of the closet in the SAME room (no teleport)', st['door'] == dn and -st['room']['W'] / 2 < lp['x'] < st['room']['W'] / 2 and 0 < lp['d'] < st['room']['L'], str(lp))
     # Hide: stay in closet with no danger → knocks → ejected
     await pg.wait_for_timeout(5000)
     st = await g.state(); pl = st['player']

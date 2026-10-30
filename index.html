@@ -1244,6 +1244,17 @@
     }
 
     // ---- V5.1 품질: 가구 밑 접지 그림자 + 벽·바닥 모서리 그늘 (방마다 메쉬 2개로 합쳐서 그림) ----
+    let EXIT_SIGN_MAT = null;
+    function exitSignMat() {
+      if (EXIT_SIGN_MAT) return EXIT_SIGN_MAT;
+      const c = document.createElement('canvas'); c.width = 256; c.height = 88; const x = c.getContext('2d');
+      x.fillStyle = '#04150c'; x.fillRect(0, 0, 256, 88);
+      x.strokeStyle = '#34d399'; x.lineWidth = 5; x.strokeRect(5, 5, 246, 78);
+      x.fillStyle = '#6ee7b7'; x.font = 'bold 44px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillText('출구 EXIT', 128, 47);
+      EXIT_SIGN_MAT = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c) });
+      return EXIT_SIGN_MAT;
+    }
     let BLOB_MAT = null, SEAM_MAT = null;
     function shadowMaterials() {
       if (BLOB_MAT) return;
@@ -1405,6 +1416,26 @@
         ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1;
         for (let i = 0; i < 6; i++) { let x = r2() * 512, y = r2() * 512; ctx.beginPath(); ctx.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (r2() - 0.5) * 40; y += (r2() - 0.5) * 40; ctx.lineTo(x, y); } ctx.stroke(); }
         addNoise(ctx, 512, 512, 22, r2);
+        return finishTex(c);
+      }
+      if (theme === 'parquet') {
+        // 바구니 짜임 쪽매 마루 (칸마다 나무 조각 방향이 번갈아 바뀜, 이음매 없이 반복)
+        const rp = texRng(515);
+        ctx.fillStyle = '#1a0d07'; ctx.fillRect(0, 0, 512, 512);
+        const C = 64, N = 3, PW = C / N;
+        for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) {
+          const horiz = (i + j) % 2 === 0;
+          for (let k = 0; k < N; k++) {
+            const v = rp();
+            ctx.fillStyle = `rgb(${50 + v * 28},${29 + v * 16},${15 + v * 9})`;
+            const x = i * C + (horiz ? 1 : k * PW + 1), y = j * C + (horiz ? k * PW + 1 : 1);
+            const w = horiz ? C - 2 : PW - 2, h = horiz ? PW - 2 : C - 2;
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = 'rgba(15,7,3,0.28)'; ctx.lineWidth = 0.8;
+            for (let g = 0; g < 2; g++) { ctx.beginPath(); if (horiz) { const gy = y + 3 + rp() * (h - 6); ctx.moveTo(x, gy); ctx.lineTo(x + w, gy + (rp() - 0.5) * 2); } else { const gx = x + 3 + rp() * (w - 6); ctx.moveTo(gx, y); ctx.lineTo(gx + (rp() - 0.5) * 2, y + h); } ctx.stroke(); }
+          }
+        }
+        addNoise(ctx, 512, 512, 14, rp);
         return finishTex(c);
       }
       if (theme === 'metal') {
@@ -1882,7 +1913,7 @@
         m.activated = true;
         if (m.type === 'bridge') m.parts.forEach(pt => { pt.mesh.scale.z = 1; pt.mesh.visible = true; });
         if (m.type === 'gear' && m.mesh) m.mesh.position.y = -2.0;
-        if (m.type === 'monolith' && m.mesh) m.mesh.position.x = m.toX;
+        if (m.type === 'monolith' && m.mesh) { m.mesh.position.x = m.toX; const rn = m.mesh.userData && m.mesh.userData.rune; if (rn) { rn.emissive.setHex(0x34d399); rn.color.setHex(0x0a3320); } }
         if (m.type === 'voxel' && room.problem && room.problem.targetGrid) { m.grid = room.problem.targetGrid; m.blocks.forEach(b => { if (b.userData.lv < m.grid[b.userData.r][b.userData.c]) { b.visible = true; b.scale.setScalar(1); } }); m.activated = false; }
         if (m.type === 'sorter') m.shapes.forEach(sh => { sh.mesh.position.y = 1.26; });
       }
@@ -1952,7 +1983,7 @@
       const floorPiece = (d0, d1) => {
         const len = d1 - d0;
         if (len <= 0.01) return;
-        const fk = floorKindOf(lay.arch);
+        const fk = lay.maze ? 'parquet' : floorKindOf(lay.arch);
         const f = new THREE.Mesh(planeGeo(W, len, Math.max(1, len / 6)), fk === 'hotel' ? mats.floor : floorMat(fk));
         f.rotation.x = -Math.PI / 2;
         at(f, 0, 0, d0 + len / 2);
@@ -2026,13 +2057,21 @@
             const sh = MathDoorsProps.createBookshelf();
             sh.position.set(rc.x, 0, -rc.d); rGroup.add(sh); break; // 바닥(y=0)에 정확히 닿게 배치
           }
-          case 'podium':
-            box(w, rc.y1, dd, mats.stone, rc.x, rc.y1 / 2, rc.d);
-            at(new THREE.Mesh(cachedGeo('cyl', 0.45, 0.6, 2.2, 12), mats.stone), rc.x, rc.y1 + 1.1, rc.d);
-            at(new THREE.Mesh(cachedGeo('sph', 0.55, 14, 10), mats.gold), rc.x, rc.y1 + 2.65, rc.d);
+          case 'podium': {
+            const ped = MathDoorsProps.createPedestal(w, rc.y1, dd);
+            ped.position.set(rc.x, 0, -rc.d); rGroup.add(ped);
             break;
+          }
           case 'monolith': {
-            const mono = box(w, rc.y1, dd, mats.stone, rc.x, rc.y1 / 2, rc.d);
+            // V5.2: 회색 상자 대신 조각된 '봉인 석문' + 바닥 레일(옆으로 밀려나는 장치)
+            const mono = MathDoorsProps.createMonolith(w, rc.y1, dd);
+            mono.position.set(rc.x, 0, -rc.d); rGroup.add(mono);
+            disposables.push(mono.userData.rune);
+            const dv = lay.device;
+            if (dv && dv.type === 'monolith') {
+              const x0 = Math.min(dv.x, dv.toX) - rc.hw, x1 = Math.max(dv.x, dv.toX) + rc.hw;
+              for (const dz of [-rc.hd + 0.18, rc.hd - 0.18]) box(x1 - x0, 0.04, 0.08, MathDoorsProps.MAT.metal, (x0 + x1) / 2, 0.02, rc.d + dz);
+            }
             rc._mesh = mono; break;
           }
           case 'voxelPad': case 'sorterPad':
@@ -2089,6 +2128,86 @@
           const p = at(new THREE.Mesh(cachedGeo('circle', 0.17, 10), mats.pupil), side * (W / 2 - 0.14), 2.4, d);
           p.rotation.y = e.rotation.y;
         }
+      }
+
+      // ---- V5.2: 방 가운데 칸막이벽을 '진짜 벽'처럼: 몰딩·통로 기둥·액자·벽등
+      (lay.rects || []).forEach((rc, ri) => {
+        if (rc.kind !== 'partition') return;
+        const across = rc.hw >= rc.hd;            // 가로로 막는 벽(지그재그·엇갈린 벽) / 세로 벽(ㄱ자)
+        const len = (across ? rc.hw : rc.hd) * 2;
+        if (len < 1.2) return;
+        for (const f of [-1, 1]) {
+          const fx = across ? rc.x : rc.x + f * (rc.hw + 0.025), fd = across ? rc.d + f * (rc.hd + 0.025) : rc.d;
+          const sw = across ? len - 0.1 : 0.05, sd = across ? 0.05 : len - 0.1;
+          [[0.10, 0.16, mats.trimWood], [1.65, 0.12, mats.trimWood], [1.78, 0.035, mats.gold], [ROOM_H - 0.15, 0.22, mats.trimWood]].forEach(([y, h, m]) => box(sw, h, sd, m, fx, y, fd));
+          const hostsFakeDoor = lay.maze && lay.maze.fakeDoors.some(fd => Math.abs(fd.x - rc.x) < rc.hw + 0.2 && Math.abs(fd.d - rc.d) < rc.hd + 0.2);
+          if (len >= 3.2 && !hostsFakeDoor) {
+            // 액자 또는 벽등 (면마다 번갈아)
+            const kind = (ri + (f > 0 ? 1 : 0)) % 2;
+            const pf = across ? 0.06 : 1.5, pd = across ? 1.5 : 0.06;
+            const ox = across ? rc.x : rc.x + f * (rc.hw + 0.04), od = across ? rc.d + f * (rc.hd + 0.04) : rc.d;
+            if (kind === 0) {
+              box(across ? 1.5 : 0.06, 1.1, across ? 0.06 : 1.5, mats.trimWood, ox, 2.6, od);
+              box(across ? 1.3 : 0.04, 0.9, across ? 0.04 : 1.3, mats.paint[(ri + f + 2) % mats.paint.length], across ? ox : ox + f * 0.03, 2.6, across ? od + f * 0.03 : od);
+            } else {
+              const sc = MathDoorsProps.makeWallSconce();
+              sc.position.set(ox, 2.65, -od);
+              sc.rotation.y = across ? (f > 0 ? Math.PI : 0) : (f > 0 ? Math.PI / 2 : -Math.PI / 2);
+              rGroup.add(sc);
+            }
+          }
+        }
+        // 벽 끝(통로 쪽)에 나무 기둥 + 머리장식 → 통로 입구로 보이게
+        if (across && !lay.maze) {
+          for (const ex of [rc.x - rc.hw, rc.x + rc.hw]) {
+            if (Math.abs(Math.abs(ex) - W / 2) < 0.35) continue;      // 바깥벽에 붙은 끝은 생략
+            const px = ex - Math.sign(ex - rc.x) * 0.15;
+            box(0.3, ROOM_H, 0.42, mats.trimWood, px, ROOM_H / 2, rc.d);
+            box(0.42, 0.18, 0.5, mats.gold, px, 3.7, rc.d);
+            box(0.4, 0.2, 0.48, mats.trimWood, px, 0.1, rc.d);
+          }
+        }
+      });
+
+      // ---- V5.2 미로: 통로마다 문틀(기둥+상인방), 잠긴 문, 출구 표지판
+      const fakeDoorList = [];
+      if (lay.maze) {
+        const mz = lay.maze;
+        mz.openings.forEach(op => {
+          const along = op.axis === 'x';                 // 가로 벽의 통로 → x 방향으로 열림
+          const hw = op.w / 2;
+          for (const sgn of [-1, 1]) {
+            const px = along ? op.x + sgn * (hw + 0.12) : op.x, pd = along ? op.d : op.d + sgn * (hw + 0.12);
+            box(along ? 0.24 : 0.44, 3.6, along ? 0.44 : 0.24, mats.trimWood, px, 1.8, pd);
+          }
+          box(along ? op.w + 0.48 : 0.3, ROOM_H - 3.4, along ? 0.3 : op.w + 0.48, mats.partition, op.x, 3.4 + (ROOM_H - 3.4) / 2, op.d);   // 문 위 벽
+          box(along ? op.w + 0.6 : 0.46, 0.22, along ? 0.46 : op.w + 0.6, mats.trimWood, op.x, 3.5, op.d);                              // 상인방
+          box(along ? op.w + 0.66 : 0.5, 0.05, along ? 0.5 : op.w + 0.66, mats.gold, op.x, 3.63, op.d);
+        });
+        // 출구 표지판: 쉬움 = 경로의 모든 통로, 보통 = 한 칸 걸러, 도전 = 없음
+        const step = gameDifficulty === 'easy' ? 1 : (gameDifficulty === 'challenge' ? 0 : 2);
+        if (step) mz.signs.forEach((sg, i) => {
+          if (i % step) return;
+          const along = sg.axis === 'x';
+          const sx = along ? sg.x : sg.x + sg.face * 0.2, sd = along ? sg.d + sg.face * 0.2 : sg.d;
+          const plate = new THREE.Mesh(boxGeo(1.1, 0.38, 0.04), exitSignMat());   // 글씨 면 = +z
+          at(plate, sx, 3.95, sd);
+          plate.rotation.y = along ? (sg.face > 0 ? Math.PI : 0) : (sg.face > 0 ? Math.PI / 2 : -Math.PI / 2);
+        });
+        // 잠긴 문 (막힌 벽에 달린 진짜 같은 문: 열리지 않음)
+        mz.fakeDoors.forEach(fd => {
+          const along = fd.axis === 'x';
+          for (const f of [-1, 1]) {
+            const fx = along ? fd.x : fd.x + f * 0.24, fdd = along ? fd.d + f * 0.24 : fd.d;   // 몰딩(0.2)보다 앞에
+            box(along ? 1.7 : 0.06, 3.0, along ? 0.06 : 1.7, mats.panelWood, fx, 1.5, fdd);
+            box(along ? 2.0 : 0.1, 0.16, along ? 0.1 : 2.0, mats.trimWood, fx, 3.06, fdd);
+            box(along ? 0.14 : 0.1, 3.1, along ? 0.1 : 0.14, mats.trimWood, along ? fx - 0.93 : fx, 1.55, along ? fdd : fdd - 0.93);
+            box(along ? 0.14 : 0.1, 3.1, along ? 0.1 : 0.14, mats.trimWood, along ? fx + 0.93 : fx, 1.55, along ? fdd : fdd + 0.93);
+            for (const py of [0.85, 2.15]) box(along ? 1.2 : 0.05, 0.9, along ? 0.05 : 1.2, mats.trimWood, along ? fx : fx + f * 0.02, py, along ? fdd + f * 0.02 : fdd);
+            at(new THREE.Mesh(cachedGeo('sph', 0.07, 10, 8), mats.gold), along ? fx + 0.6 : fx + f * 0.06, 1.45, along ? fdd + f * 0.06 : fdd + 0.6);
+            fakeDoorList.push({ wx: cx + (along ? fd.x : fd.x + f * 0.9), wz: z0 - (along ? fd.d + f * 0.9 : fd.d) });
+          }
+        });
       }
 
       // ---- 소품
@@ -2292,7 +2411,7 @@
         requiresKey: !!lay.requiresKey, keyUnlocked: !lay.requiresKey,
         puzzleSolved: plan.puzzle === 'none', unlocked: false,
         deviceDone: !(lay.device && lay.device.type === 'monolith'), gateOpen: false,
-        doors, drawers, colliders: [], mechanism3D, terminalMesh, closets, closetObj: closets[0] || null,
+        doors, drawers, colliders: [], mechanism3D, terminalMesh, closets, closetObj: closets[0] || null, fakeDoors: fakeDoorList,
         boardWorldPos, roomLight, accentLight, baseLightIntensity: baseIntensity,
         openDoorWorldX: cx + lay.exitX, lowBeams, figureMonsterMesh, disposables
       };
@@ -2516,14 +2635,15 @@
 
     // ---------------------------------------------------------------- 발소리 (표면별 음원, 움직일 때만)
     // 바닥 재질: 객실류 = 가운데 붉은 카펫 띠(폭의 58%)는 carpet, 바깥은 wood / 중앙 홀·시크 복도 = stone / 화물 창고 = metal
-    const FLOOR_KIND = { grandHall: 'stone', seek: 'stone', storage: 'metal' };
+    const FLOOR_KIND = { grandHall: 'stone', seek: 'stone', storage: 'metal', zigzag: 'parquet', slalom: 'parquet' };
     function floorKindOf(arch) { return FLOOR_KIND[arch] || 'hotel'; }
     function surfaceAt(room, lx, ld) {
       const lay = room.layout;
       if (lay.creaks && lay.creaks.some(cr => Math.abs(lx - cr.x) < cr.hw && Math.abs(ld - cr.d) < cr.hd)) return 'wood';
       if (lay.chasm && ld > lay.chasm.d0 - 0.15 && ld < lay.chasm.d1 + 0.15) return 'wood';      // 나무 다리 상판
       if (ld > lay.L + 0.05) return 'wood';                                                       // 문턱
-      const k = floorKindOf(room.roomArch);
+      const k = lay.maze ? 'parquet' : floorKindOf(room.roomArch);
+      if (k === 'parquet') return 'wood';     // 지그재그·엇갈린 벽 방: 쪽매 나무 마루
       if (k !== 'hotel') return k;
       if (lay.dupeDoors && ld > lay.frontD - 0.1) return 'wood';
       return Math.abs(lx) < lay.W * 0.289 ? 'carpet' : 'wood';
@@ -2822,6 +2942,8 @@
         mech.mesh.rotation.z += dt * 3.5;
         mech.mesh.position.y += (-2.0 - mech.mesh.position.y) * Math.min(1, dt * 2.5);
       } else if (mech.type === 'monolith' && mech.mesh) {
+        const rn = mech.mesh.userData && mech.mesh.userData.rune;
+        if (rn && rn.emissive.getHex() !== 0x34d399) { rn.emissive.setHex(0x34d399); rn.color.setHex(0x0a3320); }
         mech.mesh.position.x += (mech.toX - mech.mesh.position.x) * Math.min(1, dt * 3.0);
         if (!room.deviceDone && Math.abs(mech.toX - mech.mesh.position.x) < 0.05) {
           room.deviceDone = true;
@@ -3019,7 +3141,7 @@
         }
       }, 240 + Math.floor(Math.random() * 90));
 
-      const warnDelay = gameDifficulty === 'easy' ? 7800 : (gameDifficulty === 'challenge' ? 5400 : 6500);
+      const warnDelay = mazeWarnBonus() + gameDifficulty === 'easy' ? 7800 : (gameDifficulty === 'challenge' ? 5400 : 6500);
       rushState.warningTimerId = setTimeout(() => {
         if (!isPlaying || !rushState.warning) return;
         rushState.warning = false;
@@ -3400,7 +3522,7 @@
         fr.roomLight.intensity = reducedMotion ? 0.5 : (Math.random() * 1.4);
       }, 190);
 
-      const warnDelay = gameDifficulty === 'easy' ? 7500 : (gameDifficulty === 'challenge' ? 5200 : 6200);
+      const warnDelay = mazeWarnBonus() + gameDifficulty === 'easy' ? 7500 : (gameDifficulty === 'challenge' ? 5200 : 6200);
       ambushState.warningTimerId = setTimeout(() => {
         if (!isPlaying || !ambushState.warning) return;
         ambushState.warning = false;
@@ -4198,7 +4320,7 @@
       emModal.classList.add('flex');
       setModalFlag('emergency', true);
 
-      const totalSec = gameDifficulty === 'easy' ? 12.0 : (gameDifficulty === 'challenge' ? 7.5 : 9.5);
+      const totalSec = gameDifficulty === 'easy' ? 18.0 : (gameDifficulty === 'challenge' ? 11.0 : 15.0);   // V5.2: 문제를 읽을 시간 확보
       let remain = totalSec * 10;
       const maxTicks = remain;
       const bar = document.getElementById('em-timer-bar');
@@ -4254,9 +4376,12 @@
       }
       if (closetState !== 'NONE') return setProx('', '', '', null);
 
-      // 1. 옷장
+      // 1. 옷장 (단, 풀지 않은 단말기가 옷장보다 더 가까우면 단말기를 먼저)
+      const danger = rushState.warning || rushState.active || ambushState.warning || ambushState.active || figureState.hunt || (figureState.active && figureState.mode === 'chase');
+      const boardD = (!danger && curRoom.boardWorldPos && !curRoom.puzzleSolved && curRoom.roomArch !== 'seek') ? Math.hypot(player.x - curRoom.boardWorldPos.x, player.z - curRoom.boardWorldPos.z) : 99;
       for (const cObj of (curRoom.closets || [])) {
-        if (Math.hypot(player.x - cObj.worldX, player.z - cObj.worldZ) < 2.75) return setProx('closet' + cObj.worldZ, '🚪', '[E / 터치] 옷장 안에 숨기', () => enterClosetManually(cObj));
+        const cd = Math.hypot(player.x - cObj.worldX, player.z - cObj.worldZ);
+        if (cd < 2.75 && !(boardD < 2.8 && boardD < cd)) return setProx('closet' + cObj.worldZ, '🚪', '[E / 터치] 옷장 안에 숨기', () => enterClosetManually(cObj));
       }
       // 2. 서랍장
       for (let i = 0; i < (curRoom.drawers || []).length; i++) {
@@ -4266,6 +4391,14 @@
           const txt = ['[E / 터치] 서랍 열어보기', '[E / 터치] 서랍 안 아이템 획득', '[E / 터치] 서랍 닫기'][st];
           return setProx('drawer' + i + ':' + st, st === 1 ? '✨' : '🗄️', txt, () => inspectDrawer3D(dr));
         }
+      }
+      // 2-1. 미로의 잠긴 문
+      for (let i = 0; i < (curRoom.fakeDoors || []).length; i++) {
+        const fd = curRoom.fakeDoors[i];
+        if (Math.hypot(player.x - fd.wx, player.z - fd.wz) < 1.3) return setProx('fakeDoor' + i, '🔒', '[E / 터치] 문 열어 보기', () => {
+          playSfx('doorLocked', 0.8);
+          showToast('🔒 잠겨 있다… 다른 통로로 돌아가 보자.');
+        });
       }
       // 3. 수학 제어 단말기
       if (curRoom.boardWorldPos && curRoom.roomArch !== 'seek') {
@@ -5126,6 +5259,8 @@
       if (Math.random() < 0.35) setTimeout(() => { if (isPlaying && currentDoor === room.doorNum && !rushState.active) playSfx(Math.random() < 0.5 ? 'pipeKnock' : 'hotelWhisper', 0.35); }, 9000 + Math.random() * 8000);
     }
 
+    // 미로 방에서는 옷장까지 돌아가는 길이 있어 경고 시간을 1.5초 더 준다 (V5.2)
+    function mazeWarnBonus() { const r = activeRooms[currentDoor]; return r && r.layout && r.layout.maze ? 1500 : 0; }
     function restoreRoomLights() {
       Object.values(activeRooms).forEach(r => { if (r.roomLight) { r.roomLight.color.setHex(0xffd27d); r.roomLight.intensity = r.baseLightIntensity; } });
       lastFlickRoom = null;

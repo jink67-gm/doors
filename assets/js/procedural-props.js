@@ -58,6 +58,11 @@
        x.strokeStyle=`rgba(${rnd()<.5?40:255},${rnd()<.5?25:235},10,${a})`;x.lineWidth=.6+rnd()*2.2;x.beginPath();
        for(let u=0;u<=256;u+=8)x.lineTo(u,y+Math.sin(u*fr+i)*amp);x.stroke();}
      for(let i=0;i<4;i++){const cx=rnd()*256,cy=rnd()*256;for(let r=2;r<16;r+=2.5){x.strokeStyle=`rgba(40,22,8,${.18-r*.009})`;x.lineWidth=1;x.beginPath();x.ellipse(cx,cy,r*2.4,r*.7,0,0,Math.PI*2);x.stroke();}}
+   } else if(kind==='stone'){
+     for(let i=0;i<40;i++){const cx=rnd()*256,cy=rnd()*256,r=8+rnd()*40;const g=x.createRadialGradient(cx,cy,0,cx,cy,r);const v=rnd()<.5?0:255;g.addColorStop(0,`rgba(${v},${v},${v},${.05+rnd()*.08})`);g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(cx-r,cy-r,r*2,r*2);}
+     x.strokeStyle='rgba(0,0,0,.35)';x.lineWidth=1;
+     for(let i=0;i<7;i++){let cx=rnd()*256,cy=rnd()*256;x.beginPath();x.moveTo(cx,cy);for(let k=0;k<7;k++){cx+=(rnd()-.5)*34;cy+=(rnd()-.5)*34;x.lineTo(cx,cy);}x.stroke();}
+     for(let i=0;i<900;i++){x.fillStyle=`rgba(0,0,0,${rnd()*.18})`;x.fillRect(rnd()*256,rnd()*256,1.5,1.5);}
    } else if(kind==='fabric'){
      for(let y=0;y<256;y+=2){x.fillStyle=`rgba(0,0,0,${.05+rnd()*.06})`;x.fillRect(0,y,256,1);}
      for(let u=0;u<256;u+=2){x.fillStyle=`rgba(255,255,255,${.03+rnd()*.05})`;x.fillRect(u,0,1,256);}
@@ -69,7 +74,10 @@
    const t=new T.CanvasTexture(c);t.wrapS=t.wrapT=T.RepeatWrapping;t.anisotropy=4;return t;
  }
  try{
-   const wt=detailTex('wood'),ft=detailTex('fabric'),mt=detailTex('metal');
+   const wt=detailTex('wood'),ft=detailTex('fabric'),mt=detailTex('metal'),st=detailTex('stone');
+   MAT.stone=new T.MeshStandardMaterial({color:0x6d6a66,roughness:.9,map:st,bumpMap:st,bumpScale:.03});
+   MAT.stoneDark=new T.MeshStandardMaterial({color:0x3e3b39,roughness:.92,map:st,bumpMap:st,bumpScale:.03});
+   MAT.bronze=new T.MeshStandardMaterial({color:0x8a6236,metalness:.7,roughness:.38,map:mt});
    ['wood','dark','edge','panel'].forEach(k=>{MAT[k].map=wt;MAT[k].bumpMap=wt;MAT[k].bumpScale=.012;MAT[k].needsUpdate=true;});
    ['textile','cloth'].forEach(k=>{MAT[k].map=ft;MAT[k].needsUpdate=true;});
    ['metal'].forEach(k=>{MAT[k].map=mt;MAT[k].roughnessMap=mt;MAT[k].needsUpdate=true;});
@@ -381,7 +389,55 @@
    // Keep central walkway free; existing movement collision uses extras below.
    return extras;
  }
- window.MathDoorsProps={MAT,createWardrobe,createDrawer,createTerminal,createBridge,
+ // ---- V5.2: 출구를 막는 '봉인 석문' (예전: 회색 상자). 전체 폭 w, 높이 h, 두께 d, 바닥 중심이 원점 ----
+ function createMonolith(w=2.8,h=3.8,d=1.1){
+   const g=new T.Group();
+   const S=MAT.stone||MAT.dark, SD=MAT.stoneDark||MAT.dark, BR=MAT.bronze||MAT.gold;
+   const rune=new T.MeshStandardMaterial({color:0x330a08,emissive:0xff3b2f,emissiveIntensity:1.4,roughness:.4});
+   cube(g,w,.22,d,0,.11,0,SD);                                  // 받침
+   const sw=w-.24, sh=h-.62, sd=d-.24;
+   cube(g,sw,sh,sd,0,.22+sh/2,0,S);                           // 석판 본체
+   cube(g,w,.2,d,0,h-.3,0,SD); cube(g,w-.14,.12,d-.12,0,h-.12,0,S);   // 처마 몰딩
+   for(const f of [-1,1]){
+     const z=f*(sd/2+.02);
+     // 테두리 띠 + 안쪽으로 들어간 판
+     cube(g,sw-.1,.16,.08,0,.22+sh-.2,z,SD); cube(g,sw-.1,.16,.08,0,.42,z,SD);
+     cube(g,.16,sh-.4,.08,-sw/2+.13,.22+sh/2,z,SD); cube(g,.16,sh-.4,.08,sw/2-.13,.22+sh/2,z,SD);
+     // 청동 원판 + 고리 + 빛나는 '÷' 문양
+     const cy=.22+sh*.56;
+     const disk=cyl(g,.62,.62,.07,0,cy,z+f*.03,BR,28); disk.rotation.x=Math.PI/2;
+     const ring=torus(g,.66,.05,0,cy,z+f*.06,BR); 
+     const bar=cube(g,.62,.09,.04,0,cy,z+f*.08,rune);
+     round(g,.075,0,cy+.22,z+f*.08,rune); round(g,.075,0,cy-.22,z+f*.08,rune);
+     // 작은 수학 기호 장식 (+, ×, =)
+     cube(g,.22,.05,.03,-sw/2+.48,.22+sh*.86,z+f*.03,BR); cube(g,.05,.22,.03,-sw/2+.48,.22+sh*.86,z+f*.03,BR);
+     const x1=cube(g,.24,.05,.03,sw/2-.48,.22+sh*.86,z+f*.03,BR); x1.rotation.z=Math.PI/4;
+     const x2=cube(g,.24,.05,.03,sw/2-.48,.22+sh*.86,z+f*.03,BR); x2.rotation.z=-Math.PI/4;
+     cube(g,.24,.05,.03,0,.22+sh*.2+.05,z+f*.03,BR); cube(g,.24,.05,.03,0,.22+sh*.2-.05,z+f*.03,BR);
+     // 리벳
+     for(const rx of [-sw/2+.13,sw/2-.13]) for(const ry of [.55,.22+sh/2,.22+sh-.32]) round(g,.045,rx,ry,z+f*.05,BR);
+   }
+   // 쇠띠 두 줄 (옆면까지 감쌈)
+   for(const y of [.22+sh*.28,.22+sh*.78]){ cube(g,sw+.06,.1,sd+.06,0,y,0,MAT.metal); }
+   // 바닥 굴림대 (옆으로 밀려나는 장치임을 보여 줌)
+   for(const rz of [-d/2+.18,d/2-.18]) for(const rx of [-w/2+.35,0,w/2-.35]){ const c=cyl(g,.09,.09,.18,rx,.09,rz,BR,10); c.rotation.x=Math.PI/2; }
+   g.userData.rune=rune;
+   return g;
+ }
+ // 중앙 홀 받침대·석상 (예전: 상자+원기둥+공)
+ function createPedestal(w,h,d){
+   const g=new T.Group(); const S=MAT.stone||MAT.dark, SD=MAT.stoneDark||MAT.dark, BR=MAT.bronze||MAT.gold;
+   cube(g,w,.2,d,0,.1,0,SD); cube(g,w-.16,h-.38,d-.16,0,.2+(h-.38)/2,0,S); cube(g,w,.18,d,0,h-.09,0,SD);
+   for(const f of [-1,1]){ cube(g,w-.5,.06,.04,0,h*.5,f*(d/2-.06),BR); cube(g,.06,h-.7,.04,-w/2+.3,h*.5,f*(d/2-.06),BR); cube(g,.06,h-.7,.04,w/2-.3,h*.5,f*(d/2-.06),BR); }
+   const col=cyl(g,.42,.55,2.2,0,h+1.1,0,S,24);
+   cyl(g,.62,.62,.16,0,h+.08,0,SD,24); cyl(g,.56,.5,.14,0,h+2.25,0,SD,24);
+   for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; const f=cube(g,.06,1.9,.06,Math.cos(a)*.47,h+1.1,Math.sin(a)*.47,SD); }
+   const orb=new T.Mesh(new T.SphereGeometry(.55,24,16),new T.MeshStandardMaterial({color:0xc89a4b,metalness:.75,roughness:.28}));
+   orb.position.set(0,h+2.85,0); g.add(orb);
+   torus(g,.62,.035,0,h+2.85,0,BR).rotation.x=Math.PI/2;
+   return g;
+ }
+ window.MathDoorsProps={MAT,createMonolith,createPedestal,createWardrobe,createDrawer,createTerminal,createBridge,
    createGearLock,decorateDoorLeaf,trimDoorFrame,createBookshelf,createCrates,decorateRoom,
    makeStandingLamp,makeSideTable,makeClock,makeWallSconce,cube,round,cyl,torus,roundedBox,bevelFor,detailTex};
 })();
