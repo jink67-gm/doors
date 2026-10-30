@@ -3141,7 +3141,7 @@
         }
       }, 240 + Math.floor(Math.random() * 90));
 
-      const warnDelay = mazeWarnBonus() + gameDifficulty === 'easy' ? 7800 : (gameDifficulty === 'challenge' ? 5400 : 6500);
+      const warnDelay = mazeWarnBonus() + (gameDifficulty === 'easy' ? 7800 : (gameDifficulty === 'challenge' ? 5400 : 6500));
       rushState.warningTimerId = setTimeout(() => {
         if (!isPlaying || !rushState.warning) return;
         rushState.warning = false;
@@ -3522,7 +3522,7 @@
         fr.roomLight.intensity = reducedMotion ? 0.5 : (Math.random() * 1.4);
       }, 190);
 
-      const warnDelay = mazeWarnBonus() + gameDifficulty === 'easy' ? 7500 : (gameDifficulty === 'challenge' ? 5200 : 6200);
+      const warnDelay = mazeWarnBonus() + (gameDifficulty === 'easy' ? 7500 : (gameDifficulty === 'challenge' ? 5200 : 6200));
       ambushState.warningTimerId = setTimeout(() => {
         if (!isPlaying || !ambushState.warning) return;
         ambushState.warning = false;
