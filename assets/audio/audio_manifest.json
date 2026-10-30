@@ -1,21 +1,19 @@
 {
-  "original": "index(8).html",
+  "version": "V5-audio",
   "music": {
     "lobby": "01_title_lobby",
     "explore": "02_hotel_exploration",
     "puzzle": "03_math_puzzle",
     "darkRoom": "04_blackout_darkroom",
     "rush": "05_rush_ambush_tension",
-    "closet": "05_rush_ambush_tension",
     "ambush": "05_rush_ambush_tension",
+    "closet": "05_rush_ambush_tension",
     "seek": "06_seek_chase",
     "figure": "07_figure_library",
     "dupe": "08_dupe_secretrooms",
     "safe": "09_safe_recovery"
   },
   "effects": {
-    "step": "footstep_carpet",
-    "crouchStep": "footstep_carpet",
     "key": "keypad_press",
     "itemPickup": "item_pickup",
     "drawerOpen": "drawer_pull_open",
@@ -26,8 +24,10 @@
     "closetClose": "closet_wood_close",
     "closetRattle": "hide_closet_knocks",
     "closetCreakSlow": "closet_slow_handle",
+    "closetEnter": "closet_enter_muffle",
     "doorSlam": "door_heavy_slam",
     "doorOpen": "door_wood_creak_open",
+    "doorLock": "door_lock_click",
     "flicker": "light_flicker",
     "rushDistant": "rush_light_warning",
     "rushApproach": "rush_fast_approach",
@@ -45,12 +45,15 @@
     "figureStep": "figure_step",
     "figureGrowl": "figure_breath_growl",
     "figureAlert": "figure_alert_roar",
+    "figureSniff": "figure_sniff",
     "jackStartle": "jack_jumpscare_sting",
     "jackLaugh": "jack_creepy_laugh",
     "hideKnock": "hide_closet_knocks",
     "hideEject": "hide_force_eject",
+    "hideBreath": "hide_angry_breath",
     "hitImpact": "player_hit_dizzy",
     "playerRecover": "player_breath_recover",
+    "breath": "player_breath_recover",
     "win": "puzzle_correct",
     "puzzleCorrect": "puzzle_correct",
     "puzzleWrong": "puzzle_wrong",
@@ -62,10 +65,90 @@
     "dupeAttack": "dupe_lunge_attack",
     "seekRoar": "seek_chase_roar",
     "seekEmerge": "seek_emerge",
+    "seekSteps": "seek_steps_heavy",
     "bridge": "bridge_deploy",
-    "doorLocked": "door_rattle_locked"
+    "doorLocked": "door_rattle_locked",
+    "heartbeat": "ambient_heartbeat",
+    "pipeKnock": "ambient_pipe_knock",
+    "hotelWhisper": "ambient_hotel_whisper"
   },
-  "audio_bgm_count": 9,
-  "audio_sfx_count": 56,
-  "note": "BGM MP3 and SFX MP3; audio-manager.js; relative asset URLs for GitHub Pages."
+  "footsteps": {
+    "carpet": {
+      "walk": [
+        "footstep_carpet_walk_01",
+        "footstep_carpet_walk_02",
+        "footstep_carpet_walk_03",
+        "footstep_carpet_walk_04",
+        "footstep_carpet_walk_05"
+      ],
+      "crouch": [
+        "footstep_carpet_crouch_01",
+        "footstep_carpet_crouch_02",
+        "footstep_carpet_crouch_03"
+      ],
+      "run": [
+        "footstep_carpet_run_01",
+        "footstep_carpet_run_02",
+        "footstep_carpet_run_03"
+      ]
+    },
+    "wood": {
+      "walk": [
+        "footstep_wood_walk_01",
+        "footstep_wood_walk_02",
+        "footstep_wood_walk_03",
+        "footstep_wood_walk_04",
+        "footstep_wood_walk_05"
+      ],
+      "crouch": [
+        "footstep_wood_crouch_01",
+        "footstep_wood_crouch_02",
+        "footstep_wood_crouch_03"
+      ],
+      "run": [
+        "footstep_wood_run_01",
+        "footstep_wood_run_02",
+        "footstep_wood_run_03"
+      ]
+    },
+    "stone": {
+      "walk": [
+        "footstep_stone_walk_01",
+        "footstep_stone_walk_02",
+        "footstep_stone_walk_03",
+        "footstep_stone_walk_04",
+        "footstep_stone_walk_05"
+      ],
+      "crouch": [
+        "footstep_stone_crouch_01",
+        "footstep_stone_crouch_02",
+        "footstep_stone_crouch_03"
+      ],
+      "run": [
+        "footstep_stone_run_01",
+        "footstep_stone_run_02",
+        "footstep_stone_run_03"
+      ]
+    },
+    "metal": {
+      "walk": [
+        "footstep_metal_walk_01",
+        "footstep_metal_walk_02",
+        "footstep_metal_walk_03",
+        "footstep_metal_walk_04",
+        "footstep_metal_walk_05"
+      ],
+      "crouch": [
+        "footstep_metal_crouch_01",
+        "footstep_metal_crouch_02",
+        "footstep_metal_crouch_03"
+      ],
+      "run": [
+        "footstep_metal_run_01",
+        "footstep_metal_run_02",
+        "footstep_metal_run_03"
+      ]
+    }
+  },
+  "notes": "footstep_* 44개는 임시 합성 음원입니다. 같은 파일명의 원본 오디오 팩으로 덮어쓰면 코드 수정 없이 교체됩니다."
 }

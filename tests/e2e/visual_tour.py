@@ -2,7 +2,7 @@
 import asyncio, sys, json
 sys.path.insert(0, '/home/claude/v5/tests/e2e')
 from harness import Game, launch
-OUT = '/home/claude/shots'
+OUT = sys.argv[1] if len(sys.argv) > 1 else '/home/claude/shots'
 async def main():
     import os; os.makedirs(OUT, exist_ok=True)
     p, b, ctx, pg = await launch(viewport=(960, 600), dtcap=0.1)

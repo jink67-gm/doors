@@ -20,6 +20,11 @@ async def hide_until_safe(g, log):
         if not (st['rush']['warning'] or st['rush']['active'] or st['ambush']['warning'] or st['ambush']['active'] or st['figure']['hunt'] or (st['figure']['active'] and st['figure']['mode'] == 'chase')):
             break
         if st['closet'] == 'NONE' and not st['ui']['emergency']:
+            if st['ambush']['active']:
+                # 앰부쉬 쉬는 시간에 하이드가 밀어냄 → 다시 숨는다
+                pl = st['player']; c = min(t['closets'], key=lambda c: math.hypot(c['x'] - pl['x'], c['d'] - pl['d']))
+                await g.walk_to(c['x'], c['d'], tol=0.9, timeout=6); await g.key('KeyE'); await g.pg.wait_for_timeout(700)
+                log('    re-hid after Hide ejected during ambush pause'); continue
             break
         await g.pg.wait_for_timeout(150)
     await g.pg.wait_for_timeout(500)

@@ -48,6 +48,11 @@
       transform: scale(1.02);
     }
 
+    /* V5.1: 아주 옅은 필름 그레인 (화면이 너무 깨끗해 장난감처럼 보이는 것을 줄임) */
+    #grain-layer { position: fixed; inset: -60px; pointer-events: none; z-index: 11; opacity: .075; background-size: 160px 160px; animation: grainShift .9s steps(6) infinite; }
+    @keyframes grainShift { 0% { transform: translate(0,0); } 20% { transform: translate(-23px,17px); } 40% { transform: translate(31px,-9px); } 60% { transform: translate(-12px,-28px); } 80% { transform: translate(19px,26px); } 100% { transform: translate(0,0); } }
+    body.calm-motion #grain-layer { animation: none; }
+    @media (prefers-reduced-motion: reduce) { #grain-layer { animation: none; } }
     .vignette-overlay {
       position: fixed;
       inset: 0;
@@ -122,6 +127,7 @@
 
   <div id="webgl-container"></div>
   <div id="vignette-layer" class="vignette-overlay"></div>
+  <div id="grain-layer" aria-hidden="true"></div>
 
   <!-- 옷장 내부 은신 시점 오버레이 -->
   <div id="closet-overlay" class="fixed inset-0 z-15 pointer-events-none hidden closet-slats flex-col justify-between p-6">
@@ -218,6 +224,9 @@
       <div class="flex items-center gap-1.5 sm:gap-2">
         <button onclick="toggleReducedMotion()" id="motion-toggle-btn" class="bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-600 px-2.5 py-1.5 rounded-lg text-xs font-bold transition">
           ✨ 흔들림·번쩍임: 보통
+        </button>
+        <button onclick="toggleGraphicsQuality()" id="gfx-toggle-btn" class="bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-600 px-2.5 py-1.5 rounded-lg text-xs font-bold transition">
+          🎨 그래픽: 고품질
         </button>
         <button onclick="toggleAudioSettings(true)" class="bg-slate-800/90 hover:bg-slate-700 border border-amber-400/40 text-amber-300 px-2.5 py-1.5 rounded-lg text-xs font-bold">🎚️ 음량</button>
         <button onclick="toggleAudioMute()" id="lobby-sound-btn" class="bg-slate-800/90 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-400/50 px-2.5 py-1.5 rounded-lg text-xs font-bold transition">
@@ -601,6 +610,7 @@
     let reducedMotion = false;
     function toggleReducedMotion() {
       reducedMotion = !reducedMotion;
+      document.body.classList.toggle('calm-motion', reducedMotion);
       document.getElementById('motion-toggle-btn').innerText =
         `✨ 흔들림·번쩍임: ${reducedMotion ? '약하게' : '보통'}`;
       showToast(reducedMotion ? "화면 흔들림과 번쩍임 효과를 완화했습니다." : "기본 시각 효과로 설정했습니다.");
@@ -1039,6 +1049,8 @@
     let scene, camera, renderer, clock;
     let worldGroup;
     let ambientLight, playerPointLight, flashlightSpot, flashlightTarget;
+    let hemiLight = null;
+    const AMBIENT_BASE = 0.12, HEMI_BASE = 0.26;
     let activeRooms = {};
     let animatedDoors = [];
     let rushMonster3D = null;
@@ -1187,31 +1199,190 @@
     // =========================================================================
     // 프로시저럴 3D 텍스처 및 7대 괴물 3D 메쉬 빌더
     // =========================================================================
-    function createWallTexture(theme = 'normal') {
-      const c = document.createElement('canvas');
-      c.width = 512;
-      c.height = 512;
-      const ctx = c.getContext('2d');
-      ctx.fillStyle = theme === 'darkRoom' ? '#0d0b12' : (theme === 'library' ? '#1c1411' : '#1b1524');
-      ctx.fillRect(0, 0, 512, 512);
-
-      ctx.strokeStyle = theme === 'darkRoom' ? '#16121f' : '#261e33';
-      ctx.lineWidth = 4;
-      for (let x = 0; x < 512; x += 32) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, 512);
-        ctx.stroke();
+    // ---- V5.1 품질: 떠다니는 먼지 + 필름 그레인 ----
+    let dustPoints = null, dustVel = null;
+    function softDotTexture() {
+      const c = document.createElement('canvas'); c.width = c.height = 32; const x = c.getContext('2d');
+      const g = x.createRadialGradient(16, 16, 0, 16, 16, 16); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.4, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g; x.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(c);
+    }
+    function initAtmosphere() {
+      try {
+        const n = perf.lowPower ? 90 : 240;
+        const pos = new Float32Array(n * 3); dustVel = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) {
+          pos[i * 3] = (Math.random() - 0.5) * 12; pos[i * 3 + 1] = Math.random() * 5; pos[i * 3 + 2] = (Math.random() - 0.5) * 12;
+          dustVel[i * 3] = (Math.random() - 0.5) * 0.06; dustVel[i * 3 + 1] = (Math.random() - 0.5) * 0.03; dustVel[i * 3 + 2] = (Math.random() - 0.5) * 0.06;
+        }
+        const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        dustPoints = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.045, map: softDotTexture(), color: 0xffe2b8, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
+        dustPoints.frustumCulled = false;
+        scene.add(dustPoints);
+      } catch (e) { dustPoints = null; }
+      try {
+        const c = document.createElement('canvas'); c.width = c.height = 160; const x = c.getContext('2d'), id = x.createImageData(160, 160);
+        for (let i = 0; i < id.data.length; i += 4) { const v = Math.random() * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255; }
+        x.putImageData(id, 0, 0);
+        document.getElementById('grain-layer').style.backgroundImage = `url(${c.toDataURL()})`;
+      } catch (e) { /* 그레인 없이 진행 */ }
+    }
+    function updateAtmosphere(dt, curRoom) {
+      if (!dustPoints) return;
+      const a = dustPoints.geometry.attributes.position, p = a.array, n = a.count;
+      const cx = camera.position.x, cz = camera.position.z;
+      for (let i = 0; i < n; i++) {
+        const k = i * 3;
+        p[k] += dustVel[k] * dt; p[k + 1] += dustVel[k + 1] * dt; p[k + 2] += dustVel[k + 2] * dt;
+        // 카메라 주변 12m 상자 안에서 순환
+        if (p[k] - cx > 6) p[k] -= 12; else if (p[k] - cx < -6) p[k] += 12;
+        if (p[k + 2] - cz > 6) p[k + 2] -= 12; else if (p[k + 2] - cz < -6) p[k + 2] += 12;
+        if (p[k + 1] > 5) p[k + 1] = 0.05; else if (p[k + 1] < 0) p[k + 1] = 4.9;
       }
-      ctx.fillStyle = '#2d1c12';
-      ctx.fillRect(0, 340, 512, 172);
-      ctx.fillStyle = '#b4822c';
-      ctx.fillRect(0, 334, 512, 6);
+      a.needsUpdate = true;
+      const dark = curRoom && curRoom.roomArch === 'darkRoom';
+      dustPoints.material.opacity = dark ? (flashlightOn ? 0.22 : 0.05) : 0.5;
+    }
 
+    // ---- V5.1 품질: 가구 밑 접지 그림자 + 벽·바닥 모서리 그늘 (방마다 메쉬 2개로 합쳐서 그림) ----
+    let BLOB_MAT = null, SEAM_MAT = null;
+    function shadowMaterials() {
+      if (BLOB_MAT) return;
+      const S = 128, c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d'), id = x.createImageData(S, S);
+      for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
+        // 둥근 사각형 가장자리에서 부드럽게 사라지는 그림자
+        const u = Math.abs(i / (S - 1) * 2 - 1), v = Math.abs(j / (S - 1) * 2 - 1);
+        const dx = Math.max(0, u - 0.45), dy = Math.max(0, v - 0.45), dd = Math.hypot(dx, dy) / 0.55;
+        const a = Math.max(0, 1 - dd); const k = (j * S + i) * 4;
+        id.data[k] = id.data[k + 1] = id.data[k + 2] = 0; id.data[k + 3] = Math.round(255 * a * a * (3 - 2 * a));
+      }
+      x.putImageData(id, 0, 0);
+      BLOB_MAT = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, opacity: 0.62, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      const c2 = document.createElement('canvas'); c2.width = 64; c2.height = 4; const x2 = c2.getContext('2d');
+      const g = x2.createLinearGradient(0, 0, 64, 0); g.addColorStop(0, 'rgba(0,0,0,0.85)'); g.addColorStop(0.35, 'rgba(0,0,0,0.35)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      x2.fillStyle = g; x2.fillRect(0, 0, 64, 4);
+      SEAM_MAT = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c2), transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    }
+    // quad: (x0,d0)=텍스처 u0 쪽, 4개 꼭짓점 + uv
+    function buildFloorDecals(lay, L, W, rGroup, disposables) {
+      shadowMaterials();
+      const blobs = [], seams = [];
+      const BLOB_KINDS = { crate: 1, shelf: 1, podium: 1, debris: 1, closet: 1, drawer: 1, prop: 1, voxel: 1 };
+      (lay.rects || []).forEach(rc => {
+        if (BLOB_KINDS[rc.kind] && !(rc.y0 > 0.3)) blobs.push([rc.x - rc.hw - 0.28, rc.d - rc.hd - 0.28, rc.x + rc.hw + 0.28, rc.d + rc.hd + 0.28]);
+      });
+      (lay.circles || []).forEach(ci => { if (ci.r && ci.r < 2.5) blobs.push([ci.x - ci.r - 0.3, ci.d - ci.r - 0.3, ci.x + ci.r + 0.3, ci.d + ci.r + 0.3]); });
+      const floorOK = (d) => !lay.chasm || d < lay.chasm.d0 || d > lay.chasm.d1;
+      const runs = lay.chasm ? [[0.15, lay.chasm.d0], [lay.chasm.d1, L - 0.15]] : [[0.15, L - 0.15]];
+      const SW = 0.75, xi = W / 2 - 0.14;
+      runs.forEach(([a, b]) => { if (b - a > 0.2) { seams.push({ dir: 'xNeg', x: -xi, a, b }); seams.push({ dir: 'xPos', x: xi, a, b }); } });
+      seams.push({ dir: 'dPos', d: 0.14, a: -xi, b: xi });
+      if (floorOK(L - 0.5)) seams.push({ dir: 'dNeg', d: L - 0.14, a: -xi, b: xi });
+      (lay.rects || []).forEach(rc => {
+        if (!['wall', 'partition', 'gateWall', 'niche'].includes(rc.kind)) return;
+        if (!floorOK(rc.d)) return;
+        seams.push({ dir: 'xPos', x: rc.x + rc.hw, a: rc.d - rc.hd, b: rc.d + rc.hd, w: 0.5 });
+        seams.push({ dir: 'xNeg', x: rc.x - rc.hw, a: rc.d - rc.hd, b: rc.d + rc.hd, w: 0.5 });
+        seams.push({ dir: 'dPos', d: rc.d + rc.hd, a: rc.x - rc.hw, b: rc.x + rc.hw, w: 0.5 });
+        seams.push({ dir: 'dNeg', d: rc.d - rc.hd, a: rc.x - rc.hw, b: rc.x + rc.hw, w: 0.5 });
+      });
+      const mk = (quads) => {
+        const pos = new Float32Array(quads.length * 18), uv = new Float32Array(quads.length * 12);
+        quads.forEach((q, i) => {
+          // q = 4 corners [x,d,u,v] in order: p0,p1,p2,p3 (two triangles p0p1p2, p0p2p3)
+          const order = [0, 1, 2, 0, 2, 3];
+          order.forEach((o, k) => { const c = q[o]; pos.set([c[0], 0.012, -c[1]], i * 18 + k * 3); uv.set([c[2], c[3]], i * 12 + k * 2); });
+        });
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+        g.computeVertexNormals(); disposables.push(g); return g;
+      };
+      if (blobs.length) {
+        const m = new THREE.Mesh(mk(blobs.map(([x0, d0, x1, d1]) => [[x0, d0, 0, 0], [x1, d0, 1, 0], [x1, d1, 1, 1], [x0, d1, 0, 1]])), BLOB_MAT);
+        m.renderOrder = 1; rGroup.add(m);
+      }
+      const sq = seams.map(sm => {
+        const w = sm.w || SW;
+        if (sm.dir === 'xNeg') return [[sm.x, sm.a, 0, 0], [sm.x, sm.b, 0, 1], [sm.x + w, sm.b, 1, 1], [sm.x + w, sm.a, 1, 0]];
+        if (sm.dir === 'xPos') return [[sm.x, sm.a, 0, 0], [sm.x - w, sm.a, 1, 0], [sm.x - w, sm.b, 1, 1], [sm.x, sm.b, 0, 1]];
+        if (sm.dir === 'dPos') return [[sm.a, sm.d, 0, 0], [sm.b, sm.d, 0, 1], [sm.b, sm.d + w, 1, 1], [sm.a, sm.d + w, 1, 0]];
+        return [[sm.a, sm.d, 0, 0], [sm.a, sm.d - w, 1, 0], [sm.b, sm.d - w, 1, 1], [sm.b, sm.d, 0, 1]];
+      });
+      if (sq.length) { const m = new THREE.Mesh(mk(sq), SEAM_MAT); m.renderOrder = 1; rGroup.add(m); }
+    }
+
+    // ---- V5.1 품질: 결·얼룩·패턴이 있는 절차적 텍스처 (외부 이미지 없이 캔버스로 생성) ----
+    function texRng(seed) { let s = seed % 2147483647; if (s <= 0) s += 2147483646; return () => (s = s * 16807 % 2147483647) / 2147483647; }
+    function addNoise(ctx, w, h, amt, rnd) {
+      const id = ctx.getImageData(0, 0, w, h), d = id.data;
+      for (let i = 0; i < d.length; i += 4) { const v = (rnd() - 0.5) * amt; d[i] += v; d[i + 1] += v; d[i + 2] += v; }
+      ctx.putImageData(id, 0, 0);
+    }
+    function finishTex(c) {
       const tex = new THREE.CanvasTexture(c);
-      tex.wrapS = THREE.RepeatWrapping;
-      tex.wrapT = THREE.RepeatWrapping;
+      tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+      tex.anisotropy = (renderer && renderer.capabilities) ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 1;
       return tex;
+    }
+    function createWallTexture(theme = 'normal') {
+      const S = 512, c = document.createElement('canvas'); c.width = c.height = S;
+      const ctx = c.getContext('2d'), rnd = texRng(theme.length * 131 + 7);
+      const base = theme === 'darkRoom' ? '#0f0c14' : (theme === 'library' ? '#2a1d17' : '#2a1f33');
+      const motif = theme === 'darkRoom' ? 'rgba(60,50,80,0.18)' : (theme === 'library' ? 'rgba(150,110,60,0.14)' : 'rgba(170,140,200,0.10)');
+      const WAIN = 340; // 아래 1/3: 나무 징두리 판벽 (3D 몰딩 높이와 일치)
+      ctx.fillStyle = base; ctx.fillRect(0, 0, S, WAIN);
+      // 은은한 세로 줄무늬
+      for (let x = 0; x < S; x += 64) { ctx.fillStyle = 'rgba(255,255,255,0.025)'; ctx.fillRect(x, 0, 22, WAIN); ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.fillRect(x + 30, 0, 2, WAIN); }
+      // 다마스크 무늬
+      ctx.fillStyle = motif;
+      for (let y = -20; y < WAIN; y += 92) for (let x = 0; x <= S; x += 64) {
+        const ox = x + ((Math.round((y + 20) / 92) % 2) ? 32 : 0), oy = y + 30;
+        ctx.beginPath();
+        ctx.moveTo(ox, oy - 26);
+        ctx.bezierCurveTo(ox + 15, oy - 16, ox + 14, oy - 2, ox + 4, oy + 4);
+        ctx.bezierCurveTo(ox + 16, oy + 8, ox + 12, oy + 22, ox, oy + 28);
+        ctx.bezierCurveTo(ox - 12, oy + 22, ox - 16, oy + 8, ox - 4, oy + 4);
+        ctx.bezierCurveTo(ox - 14, oy - 2, ox - 15, oy - 16, ox, oy - 26);
+        ctx.fill();
+        ctx.fillRect(ox - 1, oy - 34, 2, 6);
+      }
+      // 물 얼룩·세월 자국 (위에서 흘러내림) + 천장 쪽 어두워짐
+      for (let i = 0; i < 9; i++) { const x = rnd() * S, w = 6 + rnd() * 26, len = 60 + rnd() * 200;
+        const g = ctx.createLinearGradient(0, 0, 0, len); g.addColorStop(0, 'rgba(10,6,4,0.28)'); g.addColorStop(1, 'rgba(10,6,4,0)');
+        ctx.fillStyle = g; ctx.fillRect(x, 0, w, len); }
+      for (let i = 0; i < 6; i++) { const x = rnd() * S, y = rnd() * WAIN, r = 20 + rnd() * 60;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(20,14,8,0.22)'); g.addColorStop(1, 'rgba(20,14,8,0)');
+        ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+      const top = ctx.createLinearGradient(0, 0, 0, 160); top.addColorStop(0, 'rgba(0,0,0,0.45)'); top.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = top; ctx.fillRect(0, 0, S, 160);
+      // 징두리 판벽: 나뭇결 + 입체 패널
+      ctx.fillStyle = theme === 'darkRoom' ? '#1d130d' : '#3a2416'; ctx.fillRect(0, WAIN, S, S - WAIN);
+      for (let i = 0; i < 90; i++) { const y = WAIN + rnd() * (S - WAIN); ctx.strokeStyle = `rgba(${rnd() < 0.5 ? 20 : 120},${rnd() < 0.5 ? 10 : 70},5,${0.08 + rnd() * 0.12})`; ctx.lineWidth = 0.6 + rnd() * 1.6; ctx.beginPath();
+        for (let x = 0; x <= S; x += 16) ctx.lineTo(x, y + Math.sin(x * 0.02 + i) * 2.5); ctx.stroke(); }
+      for (let x = 12; x < S; x += 128) {
+        const y0 = WAIN + 30, w = 104, h = S - WAIN - 62;
+        ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(x, y0, w, h);
+        ctx.fillStyle = 'rgba(255,210,150,0.12)'; ctx.fillRect(x, y0, w, 3); ctx.fillRect(x, y0, 3, h);
+        ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x, y0 + h - 3, w, 3); ctx.fillRect(x + w - 3, y0, 3, h);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x + 10, y0 + 10, w - 20, 2); ctx.fillRect(x + 10, y0 + 10, 2, h - 20);
+        ctx.fillStyle = 'rgba(255,210,150,0.08)'; ctx.fillRect(x + 10, y0 + h - 12, w - 20, 2); ctx.fillRect(x + w - 12, y0 + 10, 2, h - 20);
+      }
+      ctx.fillStyle = '#b4822c'; ctx.fillRect(0, WAIN - 6, S, 6);
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, WAIN, S, 3);
+      addNoise(ctx, S, S, 14, rnd);
+      return finishTex(c);
+    }
+
+    function createCeilingTexture() {
+      const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+      const ctx = c.getContext('2d'), rnd = texRng(4242);
+      ctx.fillStyle = '#1a1620'; ctx.fillRect(0, 0, S, S);
+      // 격자 천장(코퍼) 테두리 + 금 간 석고
+      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, S, 10); ctx.fillRect(0, 0, 10, S);
+      ctx.fillStyle = 'rgba(255,240,220,0.06)'; ctx.fillRect(10, 10, S - 10, 3); ctx.fillRect(10, 10, 3, S - 10);
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
+      for (let i = 0; i < 5; i++) { let x = rnd() * S, y = rnd() * S; ctx.beginPath(); ctx.moveTo(x, y); for (let k = 0; k < 8; k++) { x += (rnd() - 0.5) * 30; y += (rnd() - 0.5) * 30; ctx.lineTo(x, y); } ctx.stroke(); }
+      addNoise(ctx, S, S, 16, rnd);
+      return finishTex(c);
     }
 
     function createFloorTexture(theme = 'normal') {
@@ -1223,18 +1394,23 @@
         // 돌 타일 바닥 (중앙 홀·시크 복도) — 발소리 'stone'과 일치
         ctx.fillStyle = '#3a3a40'; ctx.fillRect(0, 0, 512, 512);
         for (let y = 0; y < 512; y += 128) for (let x = 0; x < 512; x += 128) {
-          const off = (y / 128) % 2 ? 64 : 0, v = 50 + ((x * 7 + y * 13) % 23);
+          const off = (y / 128) % 2 ? 64 : 0, v = 40 + ((x * 7 + y * 13) % 23);
           ctx.fillStyle = `rgb(${v},${v},${v + 6})`; ctx.fillRect((x + off) % 512, y, 124, 124);
           if ((x + off) % 512 > 384) ctx.fillRect(0, y, ((x + off) % 512) - 388, 124);
         }
         ctx.strokeStyle = '#1c1c22'; ctx.lineWidth = 4;
         for (let y = 0; y <= 512; y += 128) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke(); }
-        const tex = new THREE.CanvasTexture(c); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; return tex;
+        const r2 = texRng(777);
+        for (let i = 0; i < 14; i++) { const x = r2() * 512, y = r2() * 512, r = 15 + r2() * 50; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${r2() < 0.5 ? 0 : 255},${r2() < 0.5 ? 0 : 255},${r2() < 0.5 ? 0 : 255},0.08)`); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+        ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1;
+        for (let i = 0; i < 6; i++) { let x = r2() * 512, y = r2() * 512; ctx.beginPath(); ctx.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (r2() - 0.5) * 40; y += (r2() - 0.5) * 40; ctx.lineTo(x, y); } ctx.stroke(); }
+        addNoise(ctx, 512, 512, 22, r2);
+        return finishTex(c);
       }
       if (theme === 'metal') {
         // 철판 바닥 (화물 창고) — 발소리 'metal'과 일치
-        ctx.fillStyle = '#4a4f57'; ctx.fillRect(0, 0, 512, 512);
-        ctx.fillStyle = '#5d636c';
+        ctx.fillStyle = '#373c43'; ctx.fillRect(0, 0, 512, 512);
+        ctx.fillStyle = '#474d55';
         for (let y = 8; y < 512; y += 32) for (let x = (y / 32) % 2 ? 24 : 8; x < 512; x += 32) {
           ctx.save(); ctx.translate(x, y); ctx.rotate(((x + y) / 32) % 2 ? 0.6 : -0.6); ctx.fillRect(-9, -2.5, 18, 5); ctx.restore();
         }
@@ -1242,30 +1418,51 @@
         for (let v = 0; v <= 512; v += 256) { ctx.beginPath(); ctx.moveTo(v, 0); ctx.lineTo(v, 512); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, v); ctx.lineTo(512, v); ctx.stroke(); }
         ctx.fillStyle = '#7b818a';
         for (let v = 12; v < 512; v += 244) for (let u = 12; u < 512; u += 244) { ctx.beginPath(); ctx.arc(u, v, 4, 0, Math.PI * 2); ctx.fill(); }
-        const tex = new THREE.CanvasTexture(c); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; return tex;
+        const r3 = texRng(919);
+        for (let i = 0; i < 10; i++) { const x = r3() * 512, y = r3() * 512, r = 20 + r3() * 70; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(90,50,20,0.22)'); g.addColorStop(1, 'rgba(90,50,20,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+        addNoise(ctx, 512, 512, 18, r3);
+        return finishTex(c);
       }
-      ctx.fillStyle = '#22140c';
-      ctx.fillRect(0, 0, 512, 512);
-
-      ctx.strokeStyle = '#140b06';
-      ctx.lineWidth = 3;
-      for (let y = 0; y < 512; y += 64) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(512, y);
-        ctx.stroke();
+      // 호텔 바닥: 엇갈린 나무 마루 + 무늬 카펫 런너 (가장자리는 금색 테두리, 가운데는 닳은 자국)
+      const rnd = texRng(theme.length * 53 + 11);
+      ctx.fillStyle = '#2a170d'; ctx.fillRect(0, 0, 512, 512);
+      const PW = 26; // 마루 폭(px)
+      for (let x = 0; x < 512; x += PW) {
+        let y = -rnd() * 160;
+        while (y < 512) {
+          const len = 110 + rnd() * 140, v = rnd();
+          ctx.fillStyle = `rgb(${40 + v * 22},${23 + v * 12},${12 + v * 7})`; ctx.fillRect(x + 1, y, PW - 2, len - 2);
+          for (let k = 0; k < 4; k++) { ctx.strokeStyle = `rgba(15,8,3,${0.15 + rnd() * 0.2})`; ctx.lineWidth = 0.8; ctx.beginPath(); const gx = x + 3 + rnd() * (PW - 6); ctx.moveTo(gx, y); ctx.bezierCurveTo(gx + 3, y + len * 0.3, gx - 3, y + len * 0.6, gx + 1, y + len); ctx.stroke(); }
+          ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(x, y + len - 2, PW, 2);
+          y += len;
+        }
+        ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x, 0, 1.5, 512);
       }
-
-      ctx.fillStyle = theme === 'library' ? '#1e3a5f' : '#58111a';
-      ctx.fillRect(108, 0, 296, 512);
-      ctx.fillStyle = '#c89632';
-      ctx.fillRect(108, 0, 10, 512);
-      ctx.fillRect(394, 0, 10, 512);
-
-      const tex = new THREE.CanvasTexture(c);
-      tex.wrapS = THREE.RepeatWrapping;
-      tex.wrapT = THREE.RepeatWrapping;
-      return tex;
+      const lib = theme === 'library';
+      const RX0 = 108, RX1 = 404;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(RX0 - 6, 0, 6, 512); ctx.fillRect(RX1, 0, 6, 512);
+      ctx.fillStyle = lib ? '#1a2d49' : '#4a1016'; ctx.fillRect(RX0, 0, RX1 - RX0, 512);
+      ctx.fillStyle = lib ? '#142540' : '#3d0c12'; ctx.fillRect(RX0 + 14, 0, 22, 512); ctx.fillRect(RX1 - 36, 0, 22, 512);
+      ctx.fillStyle = '#c89632'; ctx.fillRect(RX0 + 4, 0, 5, 512); ctx.fillRect(RX1 - 9, 0, 5, 512); ctx.fillRect(RX0 + 40, 0, 2, 512); ctx.fillRect(RX1 - 42, 0, 2, 512);
+      // 반복 메달리온
+      for (let y = 0; y < 512; y += 128) {
+        const cx = 256, cy = y + 64;
+        ctx.fillStyle = lib ? 'rgba(200,170,90,0.2)' : 'rgba(210,150,60,0.18)';
+        ctx.beginPath(); ctx.moveTo(cx, cy - 46); ctx.lineTo(cx + 40, cy); ctx.lineTo(cx, cy + 46); ctx.lineTo(cx - 40, cy); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = lib ? '#1a2d49' : '#4a1016';
+        ctx.beginPath(); ctx.moveTo(cx, cy - 34); ctx.lineTo(cx + 28, cy); ctx.lineTo(cx, cy + 34); ctx.lineTo(cx - 28, cy); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = lib ? 'rgba(120,150,200,0.25)' : 'rgba(120,30,40,0.5)';
+        ctx.beginPath(); ctx.arc(cx, cy, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(210,150,60,0.14)';
+        [[-80, -40], [80, -40], [-80, 40], [80, 40]].forEach(([dx, dy]) => { ctx.beginPath(); ctx.arc(cx + dx, cy + dy, 5, 0, Math.PI * 2); ctx.fill(); });
+      }
+      // 걸어 다닌 자국(가운데 밝게 닳음) + 섬유 노이즈
+      const wear = ctx.createLinearGradient(RX0, 0, RX1, 0);
+      wear.addColorStop(0, 'rgba(0,0,0,0.25)'); wear.addColorStop(0.5, 'rgba(255,220,200,0.07)'); wear.addColorStop(1, 'rgba(0,0,0,0.25)');
+      ctx.fillStyle = wear; ctx.fillRect(RX0, 0, RX1 - RX0, 512);
+      for (let i = 0; i < 2600; i++) { ctx.fillStyle = `rgba(${rnd() < 0.5 ? 0 : 255},${rnd() < 0.5 ? 0 : 230},${rnd() < 0.5 ? 0 : 210},0.05)`; ctx.fillRect(RX0 + rnd() * (RX1 - RX0), rnd() * 512, 1, 2); }
+      addNoise(ctx, 512, 512, 12, rnd);
+      return finishTex(c);
     }
 
     function createDoorTexture(labelStr, requiresKey = false) {
@@ -1501,8 +1698,16 @@
       container.innerHTML = '';
       container.appendChild(renderer.domElement);
 
-      ambientLight = new THREE.AmbientLight(0xffeedd, 0.52);
+      // V5.1 품질: 영화용 톤매핑(밝은 조명이 하얗게 뭉개지지 않음) + 위·아래 색이 다른 반구광(평평한 주변광 대신 입체감)
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      ambientLight = new THREE.AmbientLight(0xffeedd, AMBIENT_BASE);
       scene.add(ambientLight);
+      hemiLight = new THREE.HemisphereLight(0xe8c7a0, 0x2b1a3a, HEMI_BASE);
+      scene.add(hemiLight);
+      initAtmosphere();
+      if (!gfxUserSet && perf.lowPower) gfxQuality = 'lite';
+      applyGraphicsQuality();
 
       playerPointLight = new THREE.PointLight(0xffaa55, 0.55, 11);
       scene.add(playerPointLight);
@@ -1602,8 +1807,9 @@
       return geo;
     }
     const FLOOR_MATS = {};
+    let CEIL_TEX = null;
     function floorMat(kind) {
-      if (!FLOOR_MATS[kind]) FLOOR_MATS[kind] = new THREE.MeshStandardMaterial({ map: createFloorTexture(kind), roughness: kind === 'metal' ? 0.55 : 0.85, metalness: kind === 'metal' ? 0.45 : 0 });
+      if (!FLOOR_MATS[kind]) { const t = createFloorTexture(kind); FLOOR_MATS[kind] = new THREE.MeshStandardMaterial({ map: t, bumpMap: t, bumpScale: 0.03, roughness: kind === 'metal' ? 0.5 : 0.72, metalness: kind === 'metal' ? 0.45 : 0 }); if (gfxQuality === 'lite') applyGraphicsQuality(); }
       return FLOOR_MATS[kind];
     }
     function themeMats(theme) {
@@ -1611,10 +1817,10 @@
       const wallTex = createWallTexture(theme);
       const floorTex = createFloorTexture(theme);
       const m = {
-        wall: new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.85 }),
-        partition: new THREE.MeshStandardMaterial({ map: wallTex, color: 0xcdbfe0, roughness: 0.86 }),
-        floor: new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.8 }),
-        ceil: new THREE.MeshStandardMaterial({ color: 0x0c0a12, roughness: 0.9 }),
+        wall: new THREE.MeshStandardMaterial({ map: wallTex, bumpMap: wallTex, bumpScale: 0.025, roughness: 0.82 }),
+        partition: new THREE.MeshStandardMaterial({ map: wallTex, bumpMap: wallTex, bumpScale: 0.025, color: 0xcdbfe0, roughness: 0.84 }),
+        floor: new THREE.MeshStandardMaterial({ map: floorTex, bumpMap: floorTex, bumpScale: 0.03, roughness: 0.74 }),
+        ceil: new THREE.MeshStandardMaterial({ map: CEIL_TEX || (CEIL_TEX = createCeilingTexture()), roughness: 0.95 }),
         frame: new THREE.MeshStandardMaterial({ color: 0x26150b, roughness: 0.7 }),
         debris: new THREE.MeshStandardMaterial({ color: 0x27170e, roughness: 0.85 }),
         stone: new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 }),
@@ -1634,6 +1840,7 @@
       wallTex.wrapS = THREE.RepeatWrapping;
       floorTex.wrapT = THREE.RepeatWrapping;
       THEME_MATS[theme] = m;
+      if (gfxQuality === 'lite') applyGraphicsQuality();
       return m;
     }
 
@@ -1764,7 +1971,7 @@
       } else {
         floorPiece(0, L);
       }
-      const ceiling = new THREE.Mesh(planeGeo(W, L, 1), mats.ceil);
+      const ceiling = new THREE.Mesh(planeGeo(W, L, Math.max(1, Math.round(L / 3))), mats.ceil);
       ceiling.rotation.x = Math.PI / 2;
       at(ceiling, 0, ROOM_H, L / 2);
 
@@ -1894,10 +2101,12 @@
         else if (p.type === 'bed') {
           obj = new THREE.Group();
           const f = p.foot;
-          const frame = new THREE.Mesh(boxGeo(f.hw * 2, 0.45, f.hd * 2), mats.panelWood); frame.position.y = 0.32; obj.add(frame);
-          const mat = new THREE.Mesh(boxGeo(f.hw * 2 - 0.1, 0.22, f.hd * 2 - 0.1), MathDoorsProps.MAT.textile); mat.position.y = 0.66; obj.add(mat);
-          const pil = new THREE.Mesh(boxGeo(f.hw * 1.4, 0.16, 0.45), MathDoorsProps.MAT.ivory); pil.position.set(0, 0.84, -f.hd + 0.35); obj.add(pil);
-          const head = new THREE.Mesh(boxGeo(f.hw * 2, 1.2, 0.12), mats.trimWood); head.position.set(0, 0.6, -f.hd + 0.06); obj.add(head);
+          const RB = MathDoorsProps.roundedBox, PM = MathDoorsProps.MAT;
+          const frame = new THREE.Mesh(RB(f.hw * 2, 0.45, f.hd * 2, 0.05), PM.wood); frame.position.y = 0.32; obj.add(frame);
+          const mat = new THREE.Mesh(RB(f.hw * 2 - 0.1, 0.24, f.hd * 2 - 0.1, 0.1), PM.textile); mat.position.y = 0.66; obj.add(mat);
+          const pil = new THREE.Mesh(RB(f.hw * 1.4, 0.18, 0.45, 0.08), PM.ivory); pil.position.set(0, 0.86, -f.hd + 0.35); obj.add(pil);
+          const blanket = new THREE.Mesh(RB(f.hw * 2 - 0.02, 0.08, f.hd * 1.1, 0.035), PM.cloth); blanket.position.set(0, 0.79, f.hd * 0.42); obj.add(blanket);
+          const head = new THREE.Mesh(RB(f.hw * 2, 1.2, 0.14, 0.05), PM.edge); head.position.set(0, 0.6, -f.hd + 0.07); obj.add(head);
         }
         if (obj) { obj.position.set(p.x, 0, -p.d); rGroup.add(obj); }
       });
@@ -2053,6 +2262,8 @@
         sign.material = new THREE.MeshBasicMaterial({ color: 0x86efac });
         disposables.push(sign.material);
       }
+
+      try { buildFloorDecals(lay, L, W, rGroup, disposables); } catch (e) { console.warn('floor decals skipped', e); }
 
       // ---- 조명: 방마다 정확히 2개 (주 조명 + 출구/분위기 조명)
       const baseIntensity = lay.arch === 'darkRoom' ? 0.03 : (lay.arch === 'library' ? 0.62 : (lay.arch === 'escape' ? 1.6 : 1.0));
@@ -2381,12 +2592,13 @@
       }
 
       if (curRoom && ambientLight && playerPointLight) {
+        if (hemiLight) hemiLight.intensity = curRoom.roomArch === 'darkRoom' ? (flashlightOn ? 0.08 : 0.02) : HEMI_BASE;
         if (curRoom.roomArch === 'darkRoom') {
-          ambientLight.intensity = flashlightOn ? 0.16 : 0.04;
+          ambientLight.intensity = flashlightOn ? 0.12 : 0.03;
           playerPointLight.intensity = flashlightOn ? 0.25 : 0.07;
           scene.fog.density = flashlightOn ? 0.045 : 0.085;
         } else {
-          ambientLight.intensity = 0.52;
+          ambientLight.intensity = AMBIENT_BASE;
           playerPointLight.intensity = 0.55;
           scene.fog.density = 0.032;
         }
@@ -2416,12 +2628,11 @@
               playSfx('dupeAttack', 0.9);
               applyPlayerHitEffect({
                 title: "🚪 가짜 문 안쪽에서 듀프(DUPE)가 덮쳤습니다!",
-                desc: "문이 다시 닫혔습니다. 문제를 다시 계산해 남은 문 중에서 고르세요.",
+                desc: "생명 1칸을 잃었습니다. 문이 다시 닫혔으니 계산을 다시 확인하고 남은 문을 고르세요.",
                 knockDirX: dx / dist,
                 knockDirZ: Math.max(0.65, dz / dist),
                 strength: 9.5,
-                severity: 'heavy',
-                lethal: false
+                severity: 'heavy'          // 듀프도 다른 괴물처럼 생명을 깎음 (생명 0이면 사망)
               });
             }
           } else {
@@ -2586,6 +2797,7 @@
       flashlightTarget.position.set(player.x + lookDirX * 10, player.y + lookDirY * 10, player.z + lookDirZ * 10);
 
       check3DProximity();
+      updateAtmosphere(dt, curRoom);
       renderer.render(scene, camera);
     }
 
@@ -2658,6 +2870,33 @@
     }
 
     // FPS가 낮으면 픽셀 비율을 단계적으로 낮춤 (저사양 PC·웨일북·스마트폰)
+    // V5.1 그래픽 품질: 'high' = 요철(범프)·먼지·필름 그레인 / 'lite' = 끔 (저사양 자동 전환 또는 로비 버튼)
+    let gfxQuality = 'high', gfxUserSet = false;
+    try { const q = localStorage.getItem('mathDoorsGfx'); if (q === 'high' || q === 'lite') { gfxQuality = q; gfxUserSet = true; } } catch (_) { /* 저장소 없음 */ }
+    const BUMP_SAVED = new Map();
+    function allDetailMaterials() {
+      const out = [];
+      Object.values(THEME_MATS).forEach(m => Object.values(m).forEach(v => { if (v && v.isMaterial) out.push(v); }));
+      Object.values(FLOOR_MATS).forEach(v => out.push(v));
+      if (window.MathDoorsProps) Object.values(MathDoorsProps.MAT).forEach(v => out.push(v));
+      return out;
+    }
+    function applyGraphicsQuality() {
+      const lite = gfxQuality === 'lite';
+      allDetailMaterials().forEach(m => {
+        if (lite && m.bumpMap) { BUMP_SAVED.set(m, m.bumpMap); m.bumpMap = null; m.needsUpdate = true; }
+        else if (!lite && !m.bumpMap && BUMP_SAVED.has(m)) { m.bumpMap = BUMP_SAVED.get(m); m.needsUpdate = true; }
+      });
+      if (dustPoints) dustPoints.visible = !lite;
+      const gl = document.getElementById('grain-layer'); if (gl) gl.style.display = lite ? 'none' : '';
+      const btn = document.getElementById('gfx-toggle-btn'); if (btn) btn.innerText = `🎨 그래픽: ${lite ? '가볍게' : '고품질'}`;
+    }
+    function toggleGraphicsQuality() {
+      gfxQuality = gfxQuality === 'lite' ? 'high' : 'lite'; gfxUserSet = true;
+      try { localStorage.setItem('mathDoorsGfx', gfxQuality); } catch (_) { /* 무시 */ }
+      applyGraphicsQuality();
+      showToast(gfxQuality === 'lite' ? '그래픽을 가볍게 바꿨습니다. (저사양·태블릿 권장)' : '고품질 그래픽을 켰습니다.');
+    }
     function adaptPerformance(dt) {
       perf.frames++; perf.acc += dt; perf.checkT += dt;
       if (perf.checkT < 3) return;
@@ -2665,6 +2904,7 @@
       perf.frames = 0; perf.acc = 0; perf.checkT = 0;
       perf.lastFps = fps;
       if (fps < 32 && perf.ratio > 0.65) { perf.ratio = Math.max(0.65, perf.ratio - 0.15); renderer.setPixelRatio(perf.ratio); }
+      else if (fps < 26 && !gfxUserSet && gfxQuality === 'high' && isPlaying && !window.__dtCap) { gfxQuality = 'lite'; applyGraphicsQuality(); }
       else if (fps > 57 && perf.ratio < Math.min(window.devicePixelRatio || 1, perf.lowPower ? 1.0 : 1.5) - 0.01) { perf.ratio = Math.min(perf.ratio + 0.1, perf.lowPower ? 1.0 : 1.5); renderer.setPixelRatio(perf.ratio); }
     }
 
@@ -2761,12 +3001,11 @@
       let flickCount = 0;
       const maxFlicks = 6 + Math.floor(Math.random() * 4);
       const flickInterval = setInterval(() => {
-        if ((!rushState.warning && !rushState.active) || !curRoom.roomLight) {
+        // 플레이어가 다음 방으로 도망쳐도 깜빡임이 그 방에서 계속된다
+        const fr = activeRooms[currentDoor] || curRoom;
+        if ((!rushState.warning && !rushState.active) || !fr.roomLight || !isPlaying) {
           clearInterval(flickInterval);
-          if (curRoom.roomLight) {
-            curRoom.roomLight.color.setHex(0xffd27d);
-            curRoom.roomLight.intensity = curRoom.baseLightIntensity;
-          }
+          restoreRoomLights();
           return;
         }
         flickCount++;
@@ -2774,9 +3013,9 @@
           playSfx('rushDistant', 0.9);
         }
         if (flickCount <= maxFlicks) {
-          curRoom.roomLight.intensity = reducedMotion ? 0.45 : ((flickCount % 2 === 0) ? 0.08 : 1.35);
+          fr.roomLight.intensity = reducedMotion ? 0.45 : ((flickCount % 2 === 0) ? 0.08 : 1.35);
         } else {
-          curRoom.roomLight.intensity = curRoom.baseLightIntensity * 0.4;
+          fr.roomLight.intensity = fr.baseLightIntensity * 0.4;
         }
       }, 240 + Math.floor(Math.random() * 90));
 
@@ -2786,8 +3025,9 @@
         rushState.warning = false;
         rushState.active = true;
         rushState.phase = 'SWEEPING';
-        rushState.x = curRoom.centerX;
-        rushState.z = curRoom.zStart + 26.0;
+        const nowRoom = activeRooms[currentDoor] || curRoom;
+        rushState.x = nowRoom.centerX;
+        rushState.z = nowRoom.zStart + 26.0;
         rushState.speed = gameDifficulty === 'challenge' ? 22.0 : (gameDifficulty === 'easy' ? 16.5 : 19.0);
         rushState.passSoundPlayed = false;
         setBgmMode('rush');
@@ -3147,17 +3387,17 @@
 
       let flickStep = 0;
       const ambushFlick = setInterval(() => {
-        if ((!ambushState.warning && !ambushState.active) || !curRoom.roomLight) {
+        const fr = activeRooms[currentDoor] || curRoom;
+        if ((!ambushState.warning && !ambushState.active) || !fr.roomLight || !isPlaying) {
           clearInterval(ambushFlick);
-          if (curRoom.roomLight) {
-            curRoom.roomLight.color.setHex(0xffd27d);
-            curRoom.roomLight.intensity = curRoom.baseLightIntensity;
-          }
+          restoreRoomLights();
           return;
         }
+        if (lastFlickRoom && lastFlickRoom !== fr) restoreRoomLights();
+        lastFlickRoom = fr;
         flickStep++;
-        curRoom.roomLight.color.setHex(flickStep % 2 === 0 ? 0x2dd4bf : 0xffd27d);
-        curRoom.roomLight.intensity = reducedMotion ? 0.5 : (Math.random() * 1.4);
+        fr.roomLight.color.setHex(flickStep % 2 === 0 ? 0x2dd4bf : 0xffd27d);
+        fr.roomLight.intensity = reducedMotion ? 0.5 : (Math.random() * 1.4);
       }, 190);
 
       const warnDelay = gameDifficulty === 'easy' ? 7500 : (gameDifficulty === 'challenge' ? 5200 : 6200);
@@ -3166,8 +3406,9 @@
         ambushState.warning = false;
         ambushState.active = true;
         ambushState.dir = -1;
-        ambushState.x = curRoom.centerX;
-        ambushState.z = curRoom.zStart + 25.0;
+        const nowRoom = activeRooms[currentDoor] || curRoom;
+        ambushState.x = nowRoom.centerX;
+        ambushState.z = nowRoom.zStart + 25.0;
         ambushState.speed = gameDifficulty === 'challenge' ? 26.5 : 23.0;
         ambushState.pauseTimer = 0;
         ambushState.hasHitThisPass = false;
@@ -3229,7 +3470,11 @@
           ambushState.dir *= -1;
           ambushState.hasHitThisPass = false;
           ambushState.passSound = false;
-          ambushState.pauseTimer = 1.0 + Math.random() * 0.6;
+          // 왕복 사이 쉬는 시간: 이때 옷장에 계속 있으면 하이드가 깨어나 밀어낸다 → 나왔다가 다시 숨어야 함
+          ambushState.pauseTimer = gameDifficulty === 'easy' ? 6.0 + Math.random() : (gameDifficulty === 'challenge' ? 4.3 + Math.random() * 0.7 : 5.0 + Math.random());
+          ambushState.pauseTotal = ambushState.pauseTimer;
+          hideState.ambushT = 0;
+          hideState.ambushKicked = false;   // 쉬는 시간마다 한 번만 밀어냄
         } else {
           ambushState.active = false;
           ambushMonster3D.visible = false;
@@ -3678,13 +3923,50 @@
     function updateHide3DAI(dt, curRoom) {
       if (closetState !== 'HIDDEN') {
         hideState.hideTimer = Math.max(0, hideState.hideTimer - dt * 2.5);
+        hideState.ambushT = Math.max(0, (hideState.ambushT || 0) - dt * 3);  // 잠깐 나갔다 오면 초기화
         if (hideMonster3D) hideMonster3D.visible = false;
         return;
       }
 
-      if (rushState.warning || rushState.active || ambushState.warning || ambushState.active || uiOpen.emergency || uiOpen.heartbeat || figureState.hunt || performance.now() < (hideState.graceUntil || 0)) {
-        // 앰부쉬가 왕복하는 동안(정지 구간 포함)과 위험이 끝난 직후 4초는 하이드가 밀어내지 않음
+      // 앰부쉬가 멈춰 있는 쉬는 시간: 하이드가 깨어나 노크(경고) → 밀어냄. 앰부쉬가 실제로 지나가는 순간에는 밀지 않음
+      if (ambushState.active && ambushState.pauseTimer > 0 && !uiOpen.emergency && !uiOpen.heartbeat) {
         hideState.hideTimer = 0;
+        if (hideState.ambushKicked) { if (hideMonster3D) hideMonster3D.visible = false; return; }  // 이번 쉬는 시간엔 이미 밀어냄 → 다시 숨으면 안전
+        hideState.ambushT = (hideState.ambushT || 0) + dt;
+        // 밀어낸 뒤에도 앰부쉬가 돌아오기 전까지 다시 숨을 시간(약 3초 이상)이 남도록 일찍 깨어난다
+        const warnAt = gameDifficulty === 'easy' ? 1.2 : (gameDifficulty === 'challenge' ? 0.8 : 1.0);
+        const kickAt = gameDifficulty === 'easy' ? 2.6 : (gameDifficulty === 'challenge' ? 2.0 : 2.3);
+        if (hideState.ambushT > warnAt) {
+          if (hideMonster3D && activeClosetObj) {
+            hideMonster3D.position.set(activeClosetObj.insideX + (activeClosetObj.facingRight ? -0.25 : 0.25), 2.15, activeClosetObj.worldZ);
+            hideMonster3D.lookAt(camera.position.x, camera.position.y, camera.position.z);
+            hideMonster3D.visible = true;
+          }
+          player.shakeIntensity = Math.max(player.shakeIntensity, 0.28);
+          hideState.knockCooldown -= dt;
+          if (hideState.knockCooldown <= 0) {
+            hideState.knockCooldown = 0.9;
+            playSfx('hideKnock');
+            showSoundCue('👀', '옷장 안 두드리는 소리');
+            showSubtleSubtitle(['옷장 안에서 무언가 깨어났다! 잠깐 나갔다가 다시 숨자.'], 1);
+          }
+        }
+        if (hideState.ambushT >= kickAt) {
+          hideState.ambushT = 0;
+          hideState.ambushKicked = true;
+          if (hideMonster3D) hideMonster3D.visible = false;
+          exitClosetImmediate();
+          playSfx('hideEject', 0.8);
+          player.shakeIntensity = Math.max(player.shakeIntensity, 0.6);
+          // 피해는 없음 — 대신 앰부쉬가 돌아오기 전에 다시 숨어야 한다
+          showToast('👀 하이드가 밀어냈다! 앰부쉬가 돌아오기 전에 다시 숨으세요!', 2200);
+        }
+        return;
+      }
+      if (rushState.warning || rushState.active || ambushState.warning || ambushState.active || uiOpen.emergency || uiOpen.heartbeat || figureState.hunt || performance.now() < (hideState.graceUntil || 0)) {
+        // 러쉬·앰부쉬가 지나가는 순간, 위험이 끝난 직후 4초는 하이드가 밀어내지 않음
+        hideState.hideTimer = 0;
+        if (!(ambushState.active && ambushState.pauseTimer > 0)) hideState.ambushT = 0;
         if (hideMonster3D) hideMonster3D.visible = false;
         return;
       }
@@ -4129,7 +4411,33 @@
       document.getElementById('objective-banner').innerText = currentDoor >= maxDoors ? "마지막 문이 열렸습니다! 밖으로 탈출하세요." : "문이 열렸습니다. 다음 방으로 이동해 보세요.";
     }
 
+    // 러쉬·앰부쉬 경고나 돌진 중에 문을 넘으면 괴물이 다음 방까지 따라온다.
+    // 단, 다음 방에 옷장이 없거나(다리) 시크·도서관이면 숨을 곳이 없으므로 문 앞에서 막는다.
+    let doorBlockMsgAt = 0;
+    function chaseInProgress() {
+      return (rushState.warning || (rushState.active && rushState.phase === 'SWEEPING')) ? 'rush'
+        : ((ambushState.warning || ambushState.active) ? 'ambush' : null);
+    }
     function onPlayerCrossedDoorThreshold() {
+      const carry = chaseInProgress();
+      if (carry) {
+        const next = currentDoor < maxDoors ? ensureRoomBuilt(currentDoor + 1) : null;
+        const unsafe = currentDoor >= maxDoors || !next || !next.closets.length || next.isBridgeChasmRoom || ['seek', 'library', 'bridge'].includes(next.roomArch);
+        if (unsafe) {
+          const cur = activeRooms[currentDoor], lay = cur.layout;
+          player.x = cur.centerX + lay.exitX;
+          player.z = cur.zStart - (lay.frontD - 1.1);
+          player.knockVelX = 0; player.knockVelZ = 0.0;
+          const now = performance.now();
+          if (now - doorBlockMsgAt > 1500) {
+            doorBlockMsgAt = now;
+            playSfx('doorLocked', 0.9);
+            showSoundCue('🔒', '문 너머에서 무언가 막고 있다', 'all');
+            showSubtleSubtitle(['문 너머에는 숨을 곳이 없다… 이 방 옷장에 숨어야 한다!'], 1);
+          }
+          return;
+        }
+      }
       if (currentDoor >= maxDoors) {
         finishGame(true);
         return;
@@ -4148,7 +4456,11 @@
       updateRoomVisibility();
       updateHUD();
       if (currentDoor % 5 === 0) saveCheckpoint();
-      scheduleRoomMonsterEvents(enteredRoom);
+      scheduleRoomMonsterEvents(enteredRoom, carry);
+      if (carry) {
+        showSoundCue(carry === 'rush' ? '⚡' : '🌀', '괴물이 따라오고 있다!', 'all');
+        showSubtleSubtitle(['소리가 멈추지 않는다… 이 방까지 따라온다! 옷장을 찾자!'], 1);
+      }
     }
 
     // 연속 정답 3회마다 생명 1 회복 (오답으로 생명이 1까지 줄어도 다시 회복할 길을 준다)
@@ -4759,8 +5071,8 @@
     }
 
     // 방 이벤트는 스테이지 계획(stagePlan)에 미리 정해져 있다 → 같은 방 번호에서 이벤트끼리 덮어쓰지 않음
-    function scheduleRoomMonsterEvents(room) {
-      clearAllMonsterTimers();
+    function scheduleRoomMonsterEvents(room, carry) {
+      clearAllMonsterTimers(carry);
       if (!room || !isPlaying) return;
       const objBanner = document.getElementById('objective-banner');
       const ev = (room.plan && room.plan.events) || {};
@@ -4795,6 +5107,7 @@
         objBanner.innerText = "주변을 살펴 단서를 찾고 잠긴 문을 여세요.";
       }
       if (room.doorNum <= 1) return;
+      if (carry) { if (rushState.active || ambushState.active) setBgmMode('rush'); return; }  // 따라온 괴물만 상대 (이 방의 새 이벤트는 생략)
 
       if (ev.screech) {
         screechSpawnTimerId = setTimeout(() => {
@@ -4813,10 +5126,22 @@
       if (Math.random() < 0.35) setTimeout(() => { if (isPlaying && currentDoor === room.doorNum && !rushState.active) playSfx(Math.random() < 0.5 ? 'pipeKnock' : 'hotelWhisper', 0.35); }, 9000 + Math.random() * 8000);
     }
 
-    function clearAllMonsterTimers() {
+    function restoreRoomLights() {
+      Object.values(activeRooms).forEach(r => { if (r.roomLight) { r.roomLight.color.setHex(0xffd27d); r.roomLight.intensity = r.baseLightIntensity; } });
+      lastFlickRoom = null;
+    }
+    let lastFlickRoom = null;
+    function clearAllMonsterTimers(keepChase) {
       clearTimeout(screechSpawnTimerId);
       clearTimeout(rushSpawnTimerId);
       clearTimeout(ambushSpawnTimerId);
+      if (keepChase) {
+        // 따라오는 러쉬/앰부쉬는 유지하고 나머지만 정리
+        hideScreech3D();
+        seekState.active = false; if (seekMonster3D) seekMonster3D.visible = false;
+        figureState.active = false; figureState.hunt = false;
+        return;
+      }
       clearTimeout(rushState.warningTimerId);
       clearTimeout(ambushState.warningTimerId);
       clearInterval(emergencyTimer);

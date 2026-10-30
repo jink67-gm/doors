@@ -23,7 +23,58 @@
    glass:new T.MeshStandardMaterial({color:0xffda93,emissive:0x5d350b,emissiveIntensity:.3,roughness:.2}),
    moss:new T.MeshStandardMaterial({color:0x2b4332,roughness:.95})
  };
- function cube(p,w,h,d,x,y,z,mat=MAT.wood){const k=[w,h,d].join(':');let g=boxCache.get(k);if(!g){g=new T.BoxGeometry(w,h,d);boxCache.set(k,g);}const m=new T.Mesh(g,mat);m.position.set(x,y,z);m.castShadow=false;m.receiveShadow=true;p.add(m);return m;}
+ // ---- V5.1 품질: 모서리가 둥근 상자 (딱딱한 직육면체 대신 빛을 받는 모서리) ----
+ // three.js examples RoundedBoxGeometry(MIT)와 같은 방식: 분할된 단위 상자의 꼭짓점을 안쪽 상자 + 반지름 방향으로 밀어낸다.
+ function roundedBoxGeometry(w,h,d,radius,seg=2){
+   const s2=seg*2+1;
+   radius=Math.min(w/2,h/2,d/2,radius);
+   const base=new T.BoxGeometry(1,1,1,s2,s2,s2).toNonIndexed();
+   const pos=base.attributes.position.array, nor=base.attributes.normal.array;
+   const half=.5/s2, inner=new T.Vector3(w/2-radius,h/2-radius,d/2-radius), n=new T.Vector3();
+   for(let i=0;i<pos.length;i+=3){
+     const px=pos[i],py=pos[i+1],pz=pos[i+2];
+     n.set(px-Math.sign(px)*half,py-Math.sign(py)*half,pz-Math.sign(pz)*half).normalize();
+     pos[i]=inner.x*Math.sign(px)+n.x*radius; pos[i+1]=inner.y*Math.sign(py)+n.y*radius; pos[i+2]=inner.z*Math.sign(pz)+n.z*radius;
+     nor[i]=n.x; nor[i+1]=n.y; nor[i+2]=n.z;
+   }
+   base.attributes.position.needsUpdate=true; base.attributes.normal.needsUpdate=true;
+   base.computeBoundingSphere();
+   return base;
+ }
+ const rboxCache=new Map();
+ function roundedBox(w,h,d,r){
+   const k=[w.toFixed(3),h.toFixed(3),d.toFixed(3),r.toFixed(3)].join(':');let g=rboxCache.get(k);
+   if(!g){g=roundedBoxGeometry(w,h,d,r,1);rboxCache.set(k,g);}return g;
+ }
+ // 가장 얇은 변이 4cm 이상인 조각은 모서리를 살짝 둥글게 (얇은 판·책등은 그대로 → 정점 수 절약)
+ function bevelFor(w,h,d){const m=Math.min(w,h,d);return m>=.04?Math.min(.035,m*.22):0;}
+ // ---- V5.1 품질: 공유 재질에 나뭇결·직물·금속 결 텍스처 (밝은 회색 → 재질 색에 곱해짐) ----
+ function detailTex(kind){
+   const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');
+   let seed=kind.length*977+13;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+   x.fillStyle='#e6e6e6';x.fillRect(0,0,256,256);
+   if(kind==='wood'){
+     for(let i=0;i<70;i++){const y=rnd()*256,a=.05+rnd()*.12,amp=2+rnd()*6,fr=.01+rnd()*.03;
+       x.strokeStyle=`rgba(${rnd()<.5?40:255},${rnd()<.5?25:235},10,${a})`;x.lineWidth=.6+rnd()*2.2;x.beginPath();
+       for(let u=0;u<=256;u+=8)x.lineTo(u,y+Math.sin(u*fr+i)*amp);x.stroke();}
+     for(let i=0;i<4;i++){const cx=rnd()*256,cy=rnd()*256;for(let r=2;r<16;r+=2.5){x.strokeStyle=`rgba(40,22,8,${.18-r*.009})`;x.lineWidth=1;x.beginPath();x.ellipse(cx,cy,r*2.4,r*.7,0,0,Math.PI*2);x.stroke();}}
+   } else if(kind==='fabric'){
+     for(let y=0;y<256;y+=2){x.fillStyle=`rgba(0,0,0,${.05+rnd()*.06})`;x.fillRect(0,y,256,1);}
+     for(let u=0;u<256;u+=2){x.fillStyle=`rgba(255,255,255,${.03+rnd()*.05})`;x.fillRect(u,0,1,256);}
+   } else {
+     for(let i=0;i<260;i++){const y=rnd()*256;x.fillStyle=`rgba(${rnd()<.5?0:255},${rnd()<.5?0:255},${rnd()<.5?0:255},${.04+rnd()*.07})`;x.fillRect(0,y,256,.6+rnd());}
+     for(let i=0;i<30;i++){x.strokeStyle=`rgba(255,255,255,${.06+rnd()*.1})`;x.lineWidth=.7;x.beginPath();const sx=rnd()*256,sy=rnd()*256;x.moveTo(sx,sy);x.lineTo(sx+rnd()*60-30,sy+rnd()*14-7);x.stroke();}
+   }
+   const id=x.getImageData(0,0,256,256),dd=id.data;for(let i=0;i<dd.length;i+=4){const v=(rnd()-.5)*18;dd[i]+=v;dd[i+1]+=v;dd[i+2]+=v;}x.putImageData(id,0,0);
+   const t=new T.CanvasTexture(c);t.wrapS=t.wrapT=T.RepeatWrapping;t.anisotropy=4;return t;
+ }
+ try{
+   const wt=detailTex('wood'),ft=detailTex('fabric'),mt=detailTex('metal');
+   ['wood','dark','edge','panel'].forEach(k=>{MAT[k].map=wt;MAT[k].bumpMap=wt;MAT[k].bumpScale=.012;MAT[k].needsUpdate=true;});
+   ['textile','cloth'].forEach(k=>{MAT[k].map=ft;MAT[k].needsUpdate=true;});
+   ['metal'].forEach(k=>{MAT[k].map=mt;MAT[k].roughnessMap=mt;MAT[k].needsUpdate=true;});
+ }catch(e){console.warn('detail textures skipped',e);}
+ function cube(p,w,h,d,x,y,z,mat=MAT.wood){const r=bevelFor(w,h,d);let g;if(r>0)g=roundedBox(w,h,d,r);else{const k=[w,h,d].join(':');g=boxCache.get(k);if(!g){g=new T.BoxGeometry(w,h,d);boxCache.set(k,g);}}const m=new T.Mesh(g,mat);m.position.set(x,y,z);m.castShadow=false;m.receiveShadow=true;p.add(m);return m;}
  function round(p,r,x,y,z,mat=MAT.gold){let g=sphereCache.get(r);if(!g){g=new T.SphereGeometry(r,10,8);sphereCache.set(r,g);}const m=new T.Mesh(g,mat);m.position.set(x,y,z);p.add(m);return m;}
  const cylCache=new Map(),torCache=new Map();
  function cyl(p,rt,rb,h,x,y,z,mat=MAT.wood,n=12){const k=[rt,rb,h,n].join(':');let g=cylCache.get(k);if(!g){g=new T.CylinderGeometry(rt,rb,h,n);cylCache.set(k,g);}const m=new T.Mesh(g,mat);m.position.set(x,y,z);p.add(m);return m;}
@@ -332,5 +383,5 @@
  }
  window.MathDoorsProps={MAT,createWardrobe,createDrawer,createTerminal,createBridge,
    createGearLock,decorateDoorLeaf,trimDoorFrame,createBookshelf,createCrates,decorateRoom,
-   makeStandingLamp,makeSideTable,makeClock,makeWallSconce,cube,round,cyl,torus};
+   makeStandingLamp,makeSideTable,makeClock,makeWallSconce,cube,round,cyl,torus,roundedBox,bevelFor,detailTex};
 })();
