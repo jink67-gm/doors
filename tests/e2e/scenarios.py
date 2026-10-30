@@ -243,10 +243,15 @@ async def rush_hide_test():
     await pg.wait_for_timeout(5000)
     st = await g.state(); pl = st['player']
     c = min(t['closets'], key=lambda c: math.hypot(c['x'] - pl['x'], c['d'] - pl['d']))
-    await g.walk_to(c['x'], c['d'], tol=0.9, timeout=12)
-    await g.key('KeyE'); await pg.wait_for_timeout(1500)
-    st = await g.state()
-    hidden_at = st['closet']
+    for attempt in range(3):   # 러쉬가 막 지나간 직후엔 옷장이 잠깐 닫혀 있을 수 있어 몇 번 다시 시도
+        await g.walk_to(c['x'], c['d'], tol=0.9, timeout=12)
+        prox_txt = await g.ev("document.getElementById('proximity-btn').classList.contains('hidden') ? '(none)' : document.getElementById('proximity-text').innerText")
+        await g.key('KeyE'); await pg.wait_for_timeout(1500)
+        st = await g.state()
+        hidden_at = st['closet']
+        if hidden_at == 'HIDDEN': break
+        await pg.wait_for_timeout(1500)
+    g.log(f'    hide try: prompt={prox_txt} closet={hidden_at} player={st["player"]} closet_at={c}')
     h1 = st['hearts']; ejected = False; tsec = 0
     for i in range(300):
         st = await g.state()

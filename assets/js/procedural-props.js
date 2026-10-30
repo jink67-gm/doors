@@ -8,6 +8,7 @@
  const boxCache=new Map();
  const G={}; // shared prop geometries (rooms are disposed; shared geometry is never re-created)
  const sphereCache=new Map();
+ const TEX={};
  const MAT={
    wood:new T.MeshStandardMaterial({color:0x59351f,roughness:.73}),
    dark:new T.MeshStandardMaterial({color:0x24140f,roughness:.81}),
@@ -75,6 +76,7 @@
  }
  try{
    const wt=detailTex('wood'),ft=detailTex('fabric'),mt=detailTex('metal'),st=detailTex('stone');
+   TEX.wood=wt;TEX.metal=mt;TEX.stone=st;TEX.fabric=ft;
    MAT.stone=new T.MeshStandardMaterial({color:0x6d6a66,roughness:.9,map:st,bumpMap:st,bumpScale:.03});
    MAT.stoneDark=new T.MeshStandardMaterial({color:0x3e3b39,roughness:.92,map:st,bumpMap:st,bumpScale:.03});
    MAT.bronze=new T.MeshStandardMaterial({color:0x8a6236,metalness:.7,roughness:.38,map:mt});
@@ -230,9 +232,10 @@
      }
      g.userData.screenMesh=g.children[2];
    }else{
-     cyl(g,.20,.31,1.20,0,.60,0,MAT.metal,12);
+     const S3=SEASON_ITEM.v===3, body=S3?(MAT.stone||MAT.metal):MAT.metal, headM=S3?(MAT.bronze||MAT.metal):MAT.metal;
+     cyl(g,.20,.31,1.20,0,.60,0,body,12);
      cube(g,.65,.17,.52,0,1.16,0,MAT.dark);
-     const head=cube(g,.97,.61,.20,0,1.47,0,MAT.metal);
+     const head=cube(g,.97,.61,.20,0,1.47,0,headM);
      head.rotation.x=-.37;
      const screen=cube(g,.76,.42,.065,0,1.48,.114,MAT.glass.clone());
      screen.rotation.x=-.37;
@@ -282,13 +285,16 @@
  function createBookshelf(){
    // Books are InstancedMesh batches (one draw call per colour) instead of ~100 separate meshes.
    const g=new T.Group();
-   cube(g,2.88,3.75,1.05,0,1.875,0,MAT.dark);
+   // V6.1: 예전엔 책장 전체가 꽉 찬 어두운 상자라 책이 그 안에 묻혀 보이지 않았음 → 안쪽 뒤판만 어둡게
+   cube(g,2.6,3.5,.04,0,1.86,-.34,MAT.dark);
    cube(g,2.70,3.55,.12,0,1.88,-.42,MAT.wood);
    for(const x of [-1.33,1.33]) cube(g,.15,3.70,1.14,x,1.87,0,MAT.edge);
    for(const h of [.22,1.12,2.02,2.93,3.65]) cube(g,2.9,.11,1.16,0,h,0,MAT.edge);
    if(!createBookshelf.mats){
      createBookshelf.mats=[0x452734,0x283947,0x544026,0x3b442a,0x67412d,0x444257].map(color=>new T.MeshStandardMaterial({color,roughness:.8}));
      createBookshelf.unit=new T.BoxGeometry(1,1,1);
+     // 책 묶음(InstancedMesh)의 화면 밖 판정: 단위 상자가 아니라 책장 전체 크기로 (가까이서 볼 때 책이 사라지지 않게)
+     createBookshelf.unit.boundingSphere=new T.Sphere(new T.Vector3(0,1.9,.1),2.3);
    }
    const mats=createBookshelf.mats, unit=createBookshelf.unit;
    const books=mats.map(()=>[]), strips=[];
@@ -445,8 +451,203 @@
    torus(g,.62,.035,0,h+2.85,0,BR).rotation.x=Math.PI/2;
    return g;
  }
+
+ // ===================== V6.1 시즌별 소품 (하수도·성에 호텔 가구가 나오지 않도록) =====================
+ const SM={};
+ function canvasTex(w,h,draw){const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);const t=new T.CanvasTexture(c);t.anisotropy=4;return t;}
+ function smat(){
+   if(SM.ok) return SM;
+   SM.steel=new T.MeshStandardMaterial({color:0x6a7472,metalness:.55,roughness:.48,map:TEX.metal||null});
+   SM.paint=new T.MeshStandardMaterial({color:0x2f5a50,metalness:.3,roughness:.62,map:TEX.metal||null});
+   SM.rust=new T.MeshStandardMaterial({color:0x6e3d22,metalness:.35,roughness:.78,map:TEX.stone||null});
+   SM.iron=new T.MeshStandardMaterial({color:0x2c2c30,metalness:.6,roughness:.55});
+   SM.oak=new T.MeshStandardMaterial({color:0x6a4a30,roughness:.8,map:TEX.wood||null});
+   SM.armor=new T.MeshStandardMaterial({color:0x9aa0a8,metalness:.78,roughness:.3,map:TEX.metal||null});
+   SM.cardboard=new T.MeshStandardMaterial({color:0x8a6a44,roughness:.92,map:TEX.fabric||null});
+   SM.cardboard2=new T.MeshStandardMaterial({color:0x6e5536,roughness:.92,map:TEX.fabric||null});
+   SM.canister=new T.MeshStandardMaterial({color:0x8a2f1c,metalness:.4,roughness:.5});
+   SM.candle=new T.MeshStandardMaterial({color:0xe8dcc0,roughness:.9});
+   SM.bulb=new T.MeshBasicMaterial({color:0xfff0c2});
+   SM.flame=new T.MeshBasicMaterial({color:0xff8a2a});
+   SM.flameCore=new T.MeshBasicMaterial({color:0xffe9a0});
+   SM.glowRed=new T.MeshBasicMaterial({color:0xff3b2f}); SM.glowGreen=new T.MeshBasicMaterial({color:0x34d399});
+   SM.gaugeFace=new T.MeshStandardMaterial({color:0xe9e4d6,roughness:.6});
+   SM.redCloth=new T.MeshStandardMaterial({color:0x5a0f16,roughness:.95,map:TEX.fabric||null});
+   SM.hazard=new T.MeshStandardMaterial({roughness:.7,map:canvasTex(128,32,(x,w,h)=>{x.fillStyle='#e0b020';x.fillRect(0,0,w,h);x.fillStyle='#151515';for(let i=-2;i<10;i++){x.beginPath();x.moveTo(i*16,h);x.lineTo(i*16+8,h);x.lineTo(i*16+24,0);x.lineTo(i*16+16,0);x.fill();}})});
+   const sign=(bg,fg,l1,l2,icon)=>canvasTex(256,180,(x,w,h)=>{x.fillStyle='#141414';x.fillRect(0,0,w,h);x.fillStyle=bg;x.fillRect(8,8,w-16,h-16);
+     x.fillStyle=fg;x.font='bold 64px sans-serif';x.textAlign='center';x.fillText(icon,w/2,82);x.font='bold 30px sans-serif';x.fillText(l1,w/2,124);x.font='bold 22px sans-serif';x.fillText(l2,w/2,156);
+     x.fillStyle='rgba(90,50,20,.35)';for(let i=0;i<5;i++){x.fillRect(Math.random()*w,0,6+Math.random()*10,40+Math.random()*90);}});
+   SM.signs=[sign('#e8c22a','#151515','고압 위험','HIGH VOLTAGE','⚡'),sign('#1f6b4f','#f2f2f2','배수 펌프 B-2','관계자 외 출입 금지','⛔'),sign('#e8c22a','#151515','미끄럼 주의','젖은 바닥','⚠')]
+     .map(t=>new T.MeshStandardMaterial({map:t,roughness:.6,metalness:.2}));
+   const banner=(bg,trim,emb)=>canvasTex(128,256,(x,w,h)=>{x.fillStyle=bg;x.fillRect(0,0,w,h);x.fillStyle=trim;x.fillRect(0,0,w,8);x.fillRect(0,0,8,h);x.fillRect(w-8,0,8,h);
+     x.beginPath();x.moveTo(0,h-30);x.lineTo(w/2,h);x.lineTo(w,h-30);x.lineTo(w,h);x.lineTo(0,h);x.closePath();x.fillStyle='#000';x.globalCompositeOperation='destination-out';x.fill();x.globalCompositeOperation='source-over';
+     x.fillStyle=trim;x.beginPath();x.arc(w/2,96,34,0,Math.PI*2);x.fill();x.fillStyle=bg;x.beginPath();x.arc(w/2,96,26,0,Math.PI*2);x.fill();
+     x.fillStyle=trim;x.font='bold 40px serif';x.textAlign='center';x.fillText(emb,w/2,110);
+     x.fillRect(w/2-3,150,6,60);x.fillRect(w/2-20,168,40,6);});
+   SM.banners=[banner('#5a0f16','#c49a3a','♜'),banner('#1b2346','#b8b0a0','✠')].map(t=>new T.MeshStandardMaterial({map:t,roughness:.95,transparent:true,alphaTest:.5,side:T.DoubleSide}));
+   G.flame=G.flame||new T.ConeGeometry(.08,.24,8); G.flameCore=G.flameCore||new T.ConeGeometry(.045,.14,6);
+   SM.ok=true; return SM;
+ }
+ function flame(p,x,y,z,s=1){const M=smat();const f=new T.Mesh(G.flame,M.flame);f.position.set(x,y,z);f.scale.setScalar(s);p.add(f);const c=new T.Mesh(G.flameCore,M.flameCore);c.position.set(x,y-.03*s,z);c.scale.setScalar(s);p.add(c);return f;}
+ // 시즌2·3 공용 가구 재질: 시즌2 = 페인트칠한 철판(나뭇결 대신 금속 질감), 시즌1·3 = 나무
+ function applySeasonStyle(season){
+   if(!TEX.wood) return;
+   ['wood','dark','edge','panel'].forEach(k=>{const m=MAT[k];const want=season===2?TEX.metal:TEX.wood;if(m.map!==want){m.map=want;if(m.bumpMap)m.bumpMap=want;m.needsUpdate=true;}});
+ }
+ // 벽 조명: 1 호텔 벽등 / 2 철망 작업등 / 3 횃불   (+z 가 방 안쪽)
+ function makeSeasonSconce(season){
+   if(season!==2&&season!==3) return makeWallSconce();
+   const M=smat(),g=new T.Group();
+   if(season===2){
+     cube(g,.24,.3,.06,0,0,0,M.iron); cube(g,.05,.9,.05,0,.6,.0,M.steel);
+     const arm=cyl(g,.03,.03,.24,0,0,.14,M.steel,8);arm.rotation.x=Math.PI/2;
+     round(g,.09,0,-.03,.29,M.bulb);
+     const r1=torus(g,.12,.012,0,-.03,.29,M.iron);r1.rotation.x=Math.PI/2;
+     const r2=torus(g,.12,.012,0,-.03,.29,M.iron);
+     const r3=torus(g,.12,.012,0,-.03,.29,M.iron);r3.rotation.y=Math.PI/2;
+   }else{
+     cube(g,.16,.32,.05,0,0,0,M.iron); cube(g,.04,.04,.3,0,-.06,.15,M.iron);
+     const ring=torus(g,.07,.015,0,-.02,.3,M.iron);ring.rotation.x=Math.PI/2;
+     const stick=cyl(g,.035,.045,.55,0,.12,.31,M.oak,8);stick.rotation.x=-.18;
+     cyl(g,.06,.04,.08,0,.38,.35,M.iron,8);
+     flame(g,0,.52,.36,1.15);
+   }
+   return g;
+ }
+ // 세워 두는 조명: 1 스탠드 / 2 삼각대 작업등 / 3 쇠 촛대
+ function makeSeasonStandingLamp(season){
+   if(season!==2&&season!==3) return makeStandingLamp();
+   const M=smat(),g=new T.Group();
+   if(season===2){
+     for(let i=0;i<3;i++){const a=i*2.094,leg=cyl(g,.022,.022,1.35,Math.cos(a)*.3,.64,Math.sin(a)*.3,M.steel,6);leg.rotation.z=Math.cos(a)*.42;leg.rotation.x=-Math.sin(a)*.42;}
+     cyl(g,.03,.03,1.3,0,1.85,0,M.steel,8);
+     const head=cube(g,.46,.32,.2,0,2.55,0,M.paint);head.rotation.x=-.35;
+     const face=cube(g,.38,.24,.02,0,2.53,.11,M.bulb);face.rotation.x=-.35;
+     cube(g,.5,.04,.05,0,2.34,0,M.iron);
+   }else{
+     cyl(g,.26,.34,.12,0,.06,0,M.iron,10); cyl(g,.035,.05,1.9,0,1.0,0,M.iron,8);
+     cyl(g,.32,.12,.08,0,1.95,0,M.iron,10);
+     for(const x of [-.2,0,.2]){cyl(g,.04,.04,.22,x,2.1,0,M.candle,8);flame(g,x,2.3,0,.8);}
+   }
+   return g;
+ }
+ // 작은 탁자 자리: 1 화분 탁자 / 2 기름통 / 3 나무통 + 촛불
+ function makeSeasonSideTable(season){
+   if(season!==2&&season!==3) return makeSideTable();
+   const M=smat(),g=new T.Group();
+   if(season===2){
+     cyl(g,.36,.36,1.05,0,.525,0,M.paint,16);
+     for(const y of [.32,.72]){const r=torus(g,.365,.022,0,y,0,M.steel);r.rotation.x=Math.PI/2;}
+     cyl(g,.37,.37,.15,0,.92,0,M.hazard,16); cyl(g,.33,.33,.02,0,1.06,0,M.steel,16);
+     cyl(g,.05,.05,.04,.18,1.08,.05,M.steel,8);
+   }else{
+     cyl(g,.36,.31,.5,0,.25,0,M.oak,14); cyl(g,.31,.36,.5,0,.75,0,M.oak,14);
+     for(const y of [.12,.5,.88]){const r=torus(g,y===.5?.365:.33,.02,0,y,0,M.iron);r.rotation.x=Math.PI/2;}
+     cyl(g,.3,.3,.02,0,1.0,0,M.oak,14); cyl(g,.1,.1,.02,0,1.02,0,M.iron,10);
+     cyl(g,.035,.035,.18,0,1.12,0,M.candle,8); flame(g,0,1.28,0,.7);
+   }
+   return g;
+ }
+ // 벽에 붙은 큰 물건: 1 괘종시계 / 2 전기 분전반 / 3 갑옷   (+z 가 방 안쪽)
+ function makeSeasonClock(season){
+   if(season!==2&&season!==3) return makeClock();
+   const M=smat(),g=new T.Group();
+   if(season===2){
+     cube(g,.95,2.2,.48,0,1.1,0,M.paint); cube(g,.02,2.0,.02,0,1.1,.25,M.iron);
+     for(let i=0;i<4;i++) cube(g,.6,.03,.02,0,1.85-i*.08,.25,M.iron);
+     const lab=cube(g,.42,.3,.015,.2,1.35,.25,M.signs[0]);
+     round(g,.03,-.3,1.95,.26,M.glowRed); round(g,.03,-.2,1.95,.26,M.glowGreen);
+     cube(g,.04,.2,.05,.38,1.05,.27,M.steel);
+     cyl(g,.05,.05,1.6,.3,3.0,0,M.steel,8);
+     cube(g,1.0,.12,.5,0,.06,0,M.iron);
+   }else{
+     cube(g,.7,.12,.5,0,.06,0,MAT.stoneDark||M.iron);
+     for(const x of [-.12,.12]){cyl(g,.085,.075,.85,x,.55,0,M.armor,10);round(g,.09,x,.12,.04,M.armor);}
+     cube(g,.42,.2,.26,0,1.05,0,M.armor);
+     const torso=cube(g,.48,.58,.3,0,1.45,0,M.armor);
+     for(const x of [-.3,.3]){round(g,.14,x,1.7,0,M.armor);cyl(g,.065,.06,.62,x*1.05,1.32,0,M.armor,8);}
+     round(g,.16,0,1.98,0,M.armor); cube(g,.22,.05,.05,0,1.98,.14,M.iron); cube(g,.03,.22,.04,0,2.02,.15,M.iron);
+     const sh=cyl(g,.26,.26,.05,-.08,1.3,.24,M.redCloth,18);sh.rotation.x=Math.PI/2;
+     torus(g,.26,.025,-.08,1.3,.27,MAT.gold);
+     cyl(g,.022,.022,2.5,.42,1.25,.05,M.oak,6); const tip=new T.Mesh(new T.ConeGeometry(.05,.22,6),M.armor);tip.position.set(.42,2.6,.05);g.add(tip);
+   }
+   return g;
+ }
+ // 벽 그림 자리: 2 경고 표지판 + 계기판·밸브 / 3 깃발   (+z 가 방 안쪽, 가운데 높이가 원점)
+ function makeSeasonWallArt(season,i){
+   const M=smat(),g=new T.Group();
+   if(season===2){
+     cube(g,1.0,.7,.03,0,.15,.02,M.signs[i%M.signs.length]);
+     const pipe=cyl(g,.05,.05,1.9,0,-.55,.06,M.rust,8);pipe.rotation.z=Math.PI/2;
+     const gauge=cyl(g,.15,.15,.08,.72,-.3,.08,M.steel,16);gauge.rotation.x=Math.PI/2;
+     const face=cyl(g,.12,.12,.02,.72,-.3,.125,M.gaugeFace,16);face.rotation.x=Math.PI/2;
+     const needle=cube(g,.015,.1,.01,.72,-.27,.14,M.glowRed);needle.rotation.z=-.6;
+     const wheel=torus(g,.15,.025,-.72,-.4,.12,M.canister);
+     for(let k=0;k<2;k++){const sp=cube(g,.28,.025,.025,-.72,-.4,.12,M.canister);sp.rotation.z=k*Math.PI/2;}
+   }else{
+     const rod=cyl(g,.025,.025,1.1,0,.85,.1,M.iron,8);rod.rotation.z=Math.PI/2;
+     round(g,.045,-.56,.85,.1,MAT.gold);round(g,.045,.56,.85,.1,MAT.gold);
+     const cloth=new T.Mesh(G.bannerPlane||(G.bannerPlane=new T.PlaneGeometry(.9,1.7)),M.banners[i%M.banners.length]);
+     cloth.position.set(0,0,.09);g.add(cloth);
+   }
+   return g;
+ }
+ // 침대 자리: 2 배수 펌프 / 3 연회 탁자   (발자국 반폭 hw, 반길이 hd)
+ function makeSeasonBed(season,hw,hd){
+   const M=smat(),g=new T.Group();
+   if(season===2){
+     cube(g,hw*2,.18,hd*2,0,.09,0,M.steel);
+     cube(g,hw*2+.02,.06,.08,0,.16,hd,M.hazard); cube(g,hw*2+.02,.06,.08,0,.16,-hd,M.hazard);
+     const r=Math.min(hw*.8,.55),len=hd*1.25;
+     const tank=cyl(g,r,r,len,0,.18+r,-hd*.2,M.paint,18);tank.rotation.x=Math.PI/2;
+     for(const z of [-hd*.2-len/2,-hd*.2+len/2]){const cap=cyl(g,r*.92,r*.92,.06,0,.18+r,z,M.steel,18);cap.rotation.x=Math.PI/2;}
+     for(const z of [-hd*.2-len*.3,-hd*.2+len*.3]){const b=torus(g,r+.01,.025,0,.18+r,z,M.iron);}
+     cube(g,hw*1.3,.55,hd*.42,0,.46,hd*.66,M.iron);
+     const fw=torus(g,.24,.04,hw*.75,.6,hd*.66,M.canister);fw.rotation.y=Math.PI/2;
+     cyl(g,.09,.09,2.2,-r*.4,.18+r*2+1.1,-hd*.2,M.rust,10);
+     round(g,.06,r*.5,.18+r*2,-hd*.2,M.glowGreen);
+   }else{
+     const tw=Math.max(.6,hw*2-.9);
+     cube(g,tw,.1,hd*2,0,.82,0,M.oak);
+     for(const x of [-tw/2+.1,tw/2-.1]) for(const z of [-hd+.15,hd-.15]) cube(g,.1,.77,.1,x,.39,z,M.oak);
+     cube(g,tw*.4,.012,hd*1.9,0,.876,0,M.redCloth);
+     for(const x of [-(hw-.2),hw-.2]){cube(g,.32,.08,hd*1.7,x,.45,0,M.oak);for(const z of [-hd*.7,hd*.7])cube(g,.08,.41,.08,x,.2,z,M.oak);}
+     for(const z of [-hd*.45,hd*.45]){cyl(g,.06,.09,.06,0,.9,z,M.iron,10);cyl(g,.035,.035,.2,0,1.03,z,M.candle,8);flame(g,0,1.2,z,.7);}
+     for(const z of [-hd*.75,0,hd*.75]) for(const sx of [-1,1]) cyl(g,.12,.12,.015,sx*tw*.3,.88,z,MAT.wornGold,14);
+   }
+   return g;
+ }
+ // 하수도 보일러실의 책장 자리: 철제 선반 + 상자·통 (책장과 같은 크기 2.88 × 3.75 × 1.05)
+ function createMetalRack(){
+   const M=smat(),g=new T.Group();
+   for(const x of [-1.38,1.38]) for(const z of [-.46,.46]) cube(g,.08,3.72,.08,x,1.86,z,M.steel);
+   for(const h of [.14,1.04,1.94,2.84,3.66]) cube(g,2.86,.05,1.0,0,h,0,M.steel);
+   for(const x of [-1.38,1.38]){const br=cube(g,.03,1.3,.03,x,1.5,0,M.iron);br.rotation.x=.7;}
+   if(!createMetalRack.unit){createMetalRack.unit=new T.BoxGeometry(1,1,1);createMetalRack.can=new T.CylinderGeometry(.5,.5,1,12);
+     const bs=new T.Sphere(new T.Vector3(0,1.9,0),2.3);createMetalRack.unit.boundingSphere=bs;createMetalRack.can.boundingSphere=bs.clone();}
+   const lists=[[],[],[]],m4=new T.Matrix4(),q=new T.Quaternion(),pos=new T.Vector3(),sc=new T.Vector3();
+   for(let row=0;row<4;row++){let x=-1.25,i=0;while(x<1.1){const can=(i+row)%3===2;const w=can?.26:.32+((i*5+row)%3)*.09;const h=can?.48:.3+((i*3+row*2)%4)*.08;
+     lists[can?2:(i+row)%2].push([x+w/2,.17+row*.9+h/2,((i*7+row)%3-1)*.12,w,h,can?w:.5+((i+row)%2)*.2]);x+=w+.06;i++;}}
+   lists.forEach((list,k)=>{const im=new T.InstancedMesh(k===2?createMetalRack.can:createMetalRack.unit,k===2?M.canister:(k?M.cardboard2:M.cardboard),list.length);
+     list.forEach((b,j)=>{pos.set(b[0],b[1],b[2]);sc.set(b[3],b[4],b[5]);m4.compose(pos,q,sc);im.setMatrixAt(j,m4);});im.instanceMatrix.needsUpdate=true;g.add(im);});
+   return g;
+ }
+ // 하수도 보일러실의 둥근 열람 탁자 자리: 보일러 탱크 (반지름 r)
+ function makeBoilerTank(r){
+   const M=smat(),g=new T.Group();
+   cyl(g,r*.95,r,.2,0,.1,0,M.iron,20);
+   cyl(g,r*.9,r*.9,2.4,0,1.4,0,M.rust,20);
+   const dome=new T.Mesh(G.dome||(G.dome=new T.SphereGeometry(1,20,10,0,Math.PI*2,0,Math.PI/2)),M.rust);dome.scale.set(r*.9,r*.5,r*.9);dome.position.y=2.6;g.add(dome);
+   for(const y of [.6,1.5,2.4]){const b=torus(g,r*.91,.03,0,y,0,M.iron);b.rotation.x=Math.PI/2;}
+   cube(g,.5,.42,.1,0,.65,r*.88,M.iron); cube(g,.36,.16,.02,0,.68,r*.88+.06,M.flame);
+   cyl(g,.11,.11,2.4,0,2.6+r*.5+1.1,0,M.steel,10);
+   const ga=cyl(g,.11,.11,.06,r*.5,1.9,r*.72,M.steel,14);ga.rotation.x=Math.PI/2;ga.rotation.z=-.6;
+   return g;
+ }
+ // 단말기 받침: 시즌3은 돌 받침 + 청동 머리 (성에 맞게)
  const SEASON_ITEM={v:1};
  window.MathDoorsProps={SEASON_ITEM,MAT,createMonolith,createPedestal,createWardrobe,createDrawer,createTerminal,createBridge,
    createGearLock,decorateDoorLeaf,trimDoorFrame,createBookshelf,createCrates,decorateRoom,
-   makeStandingLamp,makeSideTable,makeClock,makeWallSconce,cube,round,cyl,torus,roundedBox,bevelFor,detailTex};
+   makeStandingLamp,makeSideTable,makeClock,makeWallSconce,cube,round,cyl,torus,roundedBox,bevelFor,detailTex,
+   applySeasonStyle,makeSeasonSconce,makeSeasonStandingLamp,makeSeasonSideTable,makeSeasonClock,makeSeasonWallArt,makeSeasonBed,createMetalRack,makeBoilerTank};
 })();

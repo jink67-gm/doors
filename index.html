@@ -49,7 +49,8 @@
     }
 
     /* V5.1: 아주 옅은 필름 그레인 (화면이 너무 깨끗해 장난감처럼 보이는 것을 줄임) */
-    #grain-layer { position: fixed; inset: -60px; pointer-events: none; z-index: 11; opacity: .075; background-size: 160px 160px; animation: grainShift .9s steps(6) infinite; }
+    .diff-opt.diff-locked { opacity: .5; filter: grayscale(.7); cursor: not-allowed; }
+    #grain-layer { position: fixed; inset: -60px; pointer-events: none; z-index: 11; opacity: .035; background-size: 160px 160px; animation: grainShift 2.4s steps(6) infinite; }
     @keyframes grainShift { 0% { transform: translate(0,0); } 20% { transform: translate(-23px,17px); } 40% { transform: translate(31px,-9px); } 60% { transform: translate(-12px,-28px); } 80% { transform: translate(19px,26px); } 100% { transform: translate(0,0); } }
     body.calm-motion #grain-layer { animation: none; }
     @media (prefers-reduced-motion: reduce) { #grain-layer { animation: none; } }
@@ -185,9 +186,11 @@
       <div class="space-y-2.5 text-xs sm:text-sm text-slate-200">
         <div class="bg-slate-900/90 p-3 rounded-xl border border-sky-500/40">
           <b class="text-sky-400">🏃 이동 · 웅크리기 · 손전등 · 가구 탐색</b>
-          <p class="mt-1 text-slate-300">• <b>이동/시점:</b> 모바일은 왼쪽 <b>조이스틱</b> + 오른쪽 화면 드래그 / PC는 <b>WASD</b> + 마우스 드래그</p>
+          <p class="mt-1 text-slate-300">• <b>이동/시점:</b> 모바일은 왼쪽 <b>조이스틱</b> + 오른쪽 화면 드래그 / PC는 <b>WASD</b> + 마우스 움직이기 (ESC = 마우스 풀기)</p>
           <p class="text-slate-300">• <b>웅크리기(C / Ctrl / 상단 버튼):</b> 몸을 낮춰 발소리를 줄이고 낮은 장애물을 통과합니다.</p>
           <p class="text-slate-300">• <b>손전등(F / 버튼) & 상호작용(E / 버튼):</b> 서랍에서 열쇠·배터리·회복약을 찾고 장치를 작동하세요.</p>
+          <p class="text-slate-300">• <b>문제는 방마다 한 곳(장치·패널)에서만</b> 풀 수 있어요. 문은 잠겨 있으니 <b>노란 화살표</b>가 가리키는 장치를 찾으세요. 열쇠·퓨즈·룬 조각도 그 장치에 끼웁니다.</p>
+          <p class="text-slate-300">• <b>단계:</b> 쉬움(시즌1)을 탈출하면 보통(시즌2), 보통을 탈출하면 도전(최종)이 열립니다.</p>
         </div>
         <div class="bg-black/50 p-2.5 rounded-xl border border-rose-500/40">
           <b class="text-rose-400">⚡ 러쉬 (RUSH) & 🌀 앰부쉬 (AMBUSH)</b>
@@ -243,9 +246,6 @@
         <button onclick="toggleGuide(true)" class="bg-slate-800/90 hover:bg-slate-700 text-amber-300 border border-amber-400/40 px-2.5 py-1.5 rounded-lg text-xs font-bold transition">
           🕹️ 생존 수칙
         </button>
-        <button onclick="downloadSelfAsHtml()" class="bg-sky-950/90 hover:bg-sky-500 hover:text-slate-950 text-sky-300 border border-sky-400/50 px-2.5 py-1.5 rounded-lg text-xs font-bold transition">
-          💾 HTML 저장
-        </button>
       </div>
     </div>
 
@@ -289,17 +289,17 @@
               <span class="text-[11px] text-slate-400">난이도마다 다른 시즌·맵·괴물</span>
             </div>
             <div class="grid grid-cols-3 gap-1.5">
-              <button onclick="selectDifficulty('easy')" id="diff-btn-easy" class="diff-opt py-2 px-2 rounded-xl border-2 border-slate-700 bg-slate-900/70 text-slate-300 font-bold text-xs transition flex flex-col items-center">
+              <button onclick="selectDifficulty('easy')" id="diff-btn-easy" class="diff-opt py-2 px-2 rounded-xl border-2 border-amber-400 bg-amber-500/20 text-white font-bold text-xs transition flex flex-col items-center">
                 <span class="text-sm font-black text-emerald-300">쉬움</span>
-                <span class="text-[10px] text-slate-400">시즌 1 · 호텔</span>
+                <span id="diff-sub-easy" class="text-[10px] text-slate-400">시즌 1 · 호텔</span><span id="diff-lock-easy" class="hidden text-[10px] text-slate-500">🔒 </span>
               </button>
-              <button onclick="selectDifficulty('normal')" id="diff-btn-normal" class="diff-opt py-2 px-2 rounded-xl border-2 border-amber-400 bg-amber-500/20 text-white font-bold text-xs transition flex flex-col items-center">
+              <button onclick="selectDifficulty('normal')" id="diff-btn-normal" class="diff-opt py-2 px-2 rounded-xl border-2 border-slate-700 bg-slate-900/70 text-slate-300 font-bold text-xs transition flex flex-col items-center">
                 <span class="text-sm font-black text-amber-300">보통</span>
-                <span class="text-[10px] text-slate-300">시즌 2 · 지하 하수도</span>
+                <span id="diff-sub-normal" class="text-[10px] text-slate-300">시즌 2 · 지하 하수도</span><span id="diff-lock-normal" class="hidden text-[10px] text-slate-500">🔒 쉬움 탈출 시 열림</span>
               </button>
               <button onclick="selectDifficulty('challenge')" id="diff-btn-challenge" class="diff-opt py-2 px-2 rounded-xl border-2 border-slate-700 bg-slate-900/70 text-slate-300 font-bold text-xs transition flex flex-col items-center">
                 <span class="text-sm font-black text-rose-400">도전</span>
-                <span class="text-[10px] text-slate-400">최종 · 무너지는 성</span>
+                <span id="diff-sub-challenge" class="text-[10px] text-slate-400">최종 · 무너지는 성</span><span id="diff-lock-challenge" class="hidden text-[10px] text-slate-500">🔒 보통 탈출 시 열림</span>
               </button>
             </div>
           </div>
@@ -582,20 +582,6 @@
   <script src="assets/js/v5-core.js"></script>
   <script src="assets/js/math-bank-v5.js"></script>
   <script>
-    // 현재 HTML 문서를 index.html로 다운로드
-    function downloadSelfAsHtml() {
-      const htmlContent = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
-      const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "index.html";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
-
     function toggleGuide(show) {
       const m = document.getElementById('guide-modal');
       m.classList.toggle('hidden', !show);
@@ -627,8 +613,36 @@
     }
 
     // 난이도 설정 ('easy' | 'normal' | 'challenge')
-    let gameDifficulty = 'normal';
-    function selectDifficulty(diff) {
+    // V6.1 단계 잠금: 쉬움(시즌1)을 탈출해야 보통(시즌2), 보통을 탈출해야 도전(최종)이 열린다. 기록은 이 브라우저에 저장.
+    // 선생님 점검용: 주소 끝에 ?teacher 를 붙이면 모든 단계가 열린다.
+    const PROGRESS_KEY = 'mathDoorsCleared';
+    const DIFF_NEED = { easy: 0, normal: 1, challenge: 2 };
+    const DIFF_NAME = { easy: '쉬움 (시즌 1 · 호텔)', normal: '보통 (시즌 2 · 하수도)', challenge: '도전 (최종 · 성)' };
+    function clearedSeason() { try { return Math.max(0, Math.min(3, parseInt(localStorage.getItem(PROGRESS_KEY) || '0', 10) || 0)); } catch (_) { return 0; } }
+    function teacherUnlock() { return !!window.__unlockAll || /[?&]teacher(=|&|$)/.test(location.search); }
+    function diffUnlocked(d) { return teacherUnlock() || clearedSeason() >= (DIFF_NEED[d] || 0); }
+    function markSeasonCleared(season) { if (season > clearedSeason()) { try { localStorage.setItem(PROGRESS_KEY, String(season)); } catch (_) { /* 저장 불가: 이번 접속 동안만 */ } return true; } return false; }
+    function bestUnlockedDiff() { return diffUnlocked('challenge') ? 'challenge' : (diffUnlocked('normal') ? 'normal' : 'easy'); }
+    function refreshDifficultyLocks() {
+      ['easy', 'normal', 'challenge'].forEach(d => {
+        const btn = document.getElementById(`diff-btn-${d}`); if (!btn) return;
+        const open = diffUnlocked(d);
+        btn.classList.toggle('diff-locked', !open);
+        const lk = document.getElementById(`diff-lock-${d}`);
+        if (lk) { lk.classList.toggle('hidden', open); }
+        const sub = document.getElementById(`diff-sub-${d}`);
+        if (sub) sub.classList.toggle('hidden', !open);
+      });
+      if (!diffUnlocked(gameDifficulty)) selectDifficulty(bestUnlockedDiff(), true);
+    }
+    let gameDifficulty = 'easy';
+    function selectDifficulty(diff, force) {
+      if (!force && !diffUnlocked(diff)) {
+        const prev = diff === 'challenge' ? 'normal' : 'easy';
+        playSfx('doorLocked', 0.6);
+        showToast(`🔒 '${DIFF_NAME[prev]}'에서 탈출하면 '${DIFF_NAME[diff]}'이(가) 열립니다.`, 2800);
+        return;
+      }
       gameDifficulty = diff;
       ['easy', 'normal', 'challenge'].forEach(d => {
         const btn = document.getElementById(`diff-btn-${d}`);
@@ -1239,6 +1253,7 @@
         const tint = { 1: {}, 2: { wood: 0x4d5a5c, dark: 0x262c2e, edge: 0x6b7476, panel: 0x3d484a, textile: 0x2f4a3a, gold: 0x9a6a3a }, 3: { wood: 0x3d2b1f, dark: 0x1c1410, edge: 0x5a4636, panel: 0x33261c, textile: 0x4a1418, gold: 0x6e6e72 } }[SEASON];
         Object.keys(M).forEach(k => { const m = M[k]; if (!m || !m.color) return; if (PROP_BASE[k] === undefined) PROP_BASE[k] = m.color.getHex(); m.color.setHex(tint[k] !== undefined ? tint[k] : PROP_BASE[k]); });
         if (SEASON === 2 && M.metal) { M.wood.metalness = 0.45; M.wood.roughness = 0.55; M.edge.metalness = 0.5; } else { M.wood.metalness = 0; M.wood.roughness = 0.73; M.edge.metalness = 0; }
+        if (MathDoorsProps.applySeasonStyle) MathDoorsProps.applySeasonStyle(SEASON);
       }
       if (window.MathDoorsProps && MathDoorsProps.SEASON_ITEM) MathDoorsProps.SEASON_ITEM.v = SEASON;
       applySeasonToMonsters();
@@ -1251,7 +1266,7 @@
     const THEME_MATS = {};
     let padLights = [];
     let glowLight = null;
-    const perf = { frames: 0, acc: 0, ratio: 1.5, lowPower: false, checkT: 0 };
+    const perf = { frames: 0, acc: 0, ratio: 1.5, minRatio: 0.8, maxRatio: 1.5, lowPower: false, checkT: 0 };
     let restoringFromSave = false;
     const uiOpen = { puzzle: false, emergency: false, heartbeat: false, guide: false, audio: false };
 
@@ -1450,7 +1465,7 @@
       }
       ctx.fillStyle = '#b4822c'; ctx.fillRect(0, WAIN - 6, S, 6);
       ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, WAIN, S, 3);
-      addNoise(ctx, S, S, 14, rnd);
+      addNoise(ctx, S, S, 7, rnd);
       return finishTex(c);
     }
 
@@ -1477,7 +1492,7 @@
       for (let i = 0; i < 8; i++) { const x = rnd() * S, y = 300 + rnd() * 212, r = 30 + rnd() * 80; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(30,70,35,0.4)'); g.addColorStop(1, 'rgba(30,70,35,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
       if (!boiler) { ctx.fillStyle = dark ? 'rgba(10,40,36,0.7)' : 'rgba(20,80,72,0.75)'; ctx.fillRect(0, 340, S, 172); ctx.fillStyle = 'rgba(230,190,40,0.8)'; for (let x = -20; x < S; x += 40) { ctx.save(); ctx.translate(x, 334); ctx.transform(1, 0, 0.8, 1, 0, 0); ctx.fillRect(0, 0, 20, 8); ctx.restore(); } }
       const top = ctx.createLinearGradient(0, 0, 0, 180); top.addColorStop(0, 'rgba(0,0,0,0.55)'); top.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = top; ctx.fillRect(0, 0, S, 180);
-      addNoise(ctx, S, S, 20, rnd);
+      addNoise(ctx, S, S, 8, rnd);
       return finishTex(c);
     }
     // 시즌 3: 큰 돌 블록 성벽 + 금·이끼 + 아래쪽 어두운 초석 (서고 = 따뜻한 돌)
@@ -1498,7 +1513,7 @@
       for (let i = 0; i < 10; i++) { const x = rnd() * S, y = rnd() * S, r = 20 + rnd() * 60; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, rnd() < 0.5 ? 'rgba(40,60,30,0.35)' : 'rgba(10,6,4,0.4)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
       ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 380, S, 132);
       const top = ctx.createLinearGradient(0, 0, 0, 200); top.addColorStop(0, 'rgba(0,0,0,0.6)'); top.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = top; ctx.fillRect(0, 0, S, 200);
-      addNoise(ctx, S, S, 22, rnd);
+      addNoise(ctx, S, S, 9, rnd);
       return finishTex(c);
     }
     function createCeilingTexture() {
@@ -1508,7 +1523,7 @@
         ctx.fillStyle = SEASON === 2 ? '#1b211f' : '#140f0c'; ctx.fillRect(0, 0, S, S);
         if (SEASON === 2) { ctx.fillStyle = '#3a4440'; ctx.fillRect(40, 0, 18, S); ctx.fillRect(170, 0, 12, S); ctx.fillStyle = 'rgba(160,90,40,0.5)'; ctx.fillRect(40, 0, 18, 6); }
         else { ctx.fillStyle = '#2a1d14'; ctx.fillRect(0, 0, S, 36); ctx.fillRect(0, 128, S, 36); ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(0, 32, S, 6); ctx.fillRect(0, 160, S, 6); }
-        addNoise(ctx, S, S, 18, rnd);
+        addNoise(ctx, S, S, 8, rnd);
         return finishTex(c);
       }
       const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
@@ -1519,7 +1534,7 @@
       ctx.fillStyle = 'rgba(255,240,220,0.06)'; ctx.fillRect(10, 10, S - 10, 3); ctx.fillRect(10, 10, 3, S - 10);
       ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
       for (let i = 0; i < 5; i++) { let x = rnd() * S, y = rnd() * S; ctx.beginPath(); ctx.moveTo(x, y); for (let k = 0; k < 8; k++) { x += (rnd() - 0.5) * 30; y += (rnd() - 0.5) * 30; ctx.lineTo(x, y); } ctx.stroke(); }
-      addNoise(ctx, S, S, 16, rnd);
+      addNoise(ctx, S, S, 7, rnd);
       return finishTex(c);
     }
 
@@ -1542,31 +1557,29 @@
         for (let i = 0; i < 14; i++) { const x = r2() * 512, y = r2() * 512, r = 15 + r2() * 50; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${r2() < 0.5 ? 0 : 255},${r2() < 0.5 ? 0 : 255},${r2() < 0.5 ? 0 : 255},0.08)`); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
         ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1;
         for (let i = 0; i < 6; i++) { let x = r2() * 512, y = r2() * 512; ctx.beginPath(); ctx.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (r2() - 0.5) * 40; y += (r2() - 0.5) * 40; ctx.lineTo(x, y); } ctx.stroke(); }
-        addNoise(ctx, 512, 512, 22, r2);
+        addNoise(ctx, 512, 512, 9, r2);
         return finishTex(c);
       }
       if (theme === 'sewer') {
-        // 젖은 콘크리트 + 가운데 배수 철망 (발소리: 가운데 = 금속, 나머지 = 돌)
+        // 젖은 콘크리트 판 (4 m 마다 반복되는 무늬, 이음매 없음). 가운데 배수 철망은 따로 깔린 띠(createGrateTexture)
         const r4 = texRng(4404);
-        ctx.fillStyle = '#3c4441'; ctx.fillRect(0, 0, 512, 512);
-        for (let y = 0; y < 512; y += 128) for (let x = 0; x < 512; x += 128) { const v = r4(); ctx.fillStyle = `rgb(${54 + v * 18},${62 + v * 18},${58 + v * 16})`; ctx.fillRect(x + 2, y + 2, 124, 124); }
-        for (let i = 0; i < 16; i++) { const x = r4() * 512, y = r4() * 512, r = 20 + r4() * 70; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(10,25,20,0.45)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
-        ctx.fillStyle = '#16191a'; ctx.fillRect(196, 0, 120, 512);
-        ctx.strokeStyle = '#5e6668'; ctx.lineWidth = 3;
-        for (let y = 0; y < 512; y += 14) { ctx.beginPath(); ctx.moveTo(196, y); ctx.lineTo(316, y); ctx.stroke(); }
-        ctx.fillStyle = '#4b5355'; ctx.fillRect(190, 0, 8, 512); ctx.fillRect(314, 0, 8, 512);
-        addNoise(ctx, 512, 512, 18, r4);
+        ctx.fillStyle = '#2e3533'; ctx.fillRect(0, 0, 512, 512);
+        for (let y = 0; y < 512; y += 128) for (let x = 0; x < 512; x += 128) { const v = r4(); ctx.fillStyle = `rgb(${58 + v * 14},${66 + v * 14},${62 + v * 12})`; ctx.fillRect(x + 3, y + 3, 122, 122);
+          ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fillRect(x + 3, y + 3, 122, 3); }
+        // 물 고인 자국 (가장자리가 부드러운 큰 얼룩만 — 작은 점무늬는 멀리서 반짝거려 보여서 쓰지 않음)
+        for (let i = 0; i < 9; i++) { const x = r4() * 512, y = r4() * 512, r = 40 + r4() * 80; for (const ox of [-512, 0, 512]) for (const oy of [-512, 0, 512]) { const g = ctx.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r); g.addColorStop(0, 'rgba(8,22,18,0.35)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x + ox - r, y + oy - r, r * 2, r * 2); } }
+        addNoise(ctx, 512, 512, 6, r4);
         return finishTex(c);
       }
       if (theme === 'castle') {
-        // 판석 바닥 + 낡고 찢어진 붉은 카펫 (발소리: 카펫 / 돌)
+        // 판석 바닥 (반복 무늬). 가운데 낡은 붉은 카펫은 따로 깔린 띠(createCarpetTexture)
         const r5 = texRng(5505);
         ctx.fillStyle = '#1c1816'; ctx.fillRect(0, 0, 512, 512);
-        for (let y = 0; y < 512; y += 96) for (let x = ((y / 96) | 0) % 2 ? -48 : 0; x < 512; x += 96) { const v = r5(); const b = 52 + v * 26; ctx.fillStyle = `rgb(${b + 4},${b},${b - 4})`; ctx.fillRect(x + 3, y + 3, 90, 90); }
-        ctx.fillStyle = '#360c10'; ctx.fillRect(150, 0, 212, 512);
-        ctx.fillStyle = 'rgba(160,120,50,0.5)'; ctx.fillRect(156, 0, 4, 512); ctx.fillRect(352, 0, 4, 512);
-        for (let i = 0; i < 6; i++) { const y = r5() * 512, h = 20 + r5() * 50, side = r5() < 0.5; ctx.fillStyle = '#1c1816'; ctx.beginPath(); ctx.moveTo(side ? 150 : 362, y); ctx.lineTo(side ? 150 + 20 + r5() * 30 : 362 - 20 - r5() * 30, y + h / 2); ctx.lineTo(side ? 150 : 362, y + h); ctx.fill(); }
-        addNoise(ctx, 512, 512, 20, r5);
+        for (let y = 0; y < 512; y += 128) for (let x = ((y / 128) | 0) % 2 ? -64 : 0; x < 512; x += 128) { const v = r5(); const b = 54 + v * 22; ctx.fillStyle = `rgb(${b + 5},${b},${b - 5})`; ctx.fillRect(x + 3, y + 3, 122, 122);
+          ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(x + 3, y + 3, 122, 3); ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(x + 3, y + 119, 122, 6); }
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
+        for (let i = 0; i < 5; i++) { let x = 20 + r5() * 470, y = 20 + r5() * 470; ctx.beginPath(); ctx.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (r5() - 0.5) * 30; y += (r5() - 0.5) * 30; ctx.lineTo(x, y); } ctx.stroke(); }
+        addNoise(ctx, 512, 512, 6, r5);
         return finishTex(c);
       }
       if (theme === 'parquet') {
@@ -1586,7 +1599,7 @@
             for (let g = 0; g < 2; g++) { ctx.beginPath(); if (horiz) { const gy = y + 3 + rp() * (h - 6); ctx.moveTo(x, gy); ctx.lineTo(x + w, gy + (rp() - 0.5) * 2); } else { const gx = x + 3 + rp() * (w - 6); ctx.moveTo(gx, y); ctx.lineTo(gx + (rp() - 0.5) * 2, y + h); } ctx.stroke(); }
           }
         }
-        addNoise(ctx, 512, 512, 14, rp);
+        addNoise(ctx, 512, 512, 7, rp);
         return finishTex(c);
       }
       if (theme === 'metal') {
@@ -1602,7 +1615,7 @@
         for (let v = 12; v < 512; v += 244) for (let u = 12; u < 512; u += 244) { ctx.beginPath(); ctx.arc(u, v, 4, 0, Math.PI * 2); ctx.fill(); }
         const r3 = texRng(919);
         for (let i = 0; i < 10; i++) { const x = r3() * 512, y = r3() * 512, r = 20 + r3() * 70; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(90,50,20,0.22)'); g.addColorStop(1, 'rgba(90,50,20,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
-        addNoise(ctx, 512, 512, 18, r3);
+        addNoise(ctx, 512, 512, 8, r3);
         return finishTex(c);
       }
       // 호텔 바닥: 엇갈린 나무 마루 + 무늬 카펫 런너 (가장자리는 금색 테두리, 가운데는 닳은 자국)
@@ -1643,9 +1656,42 @@
       wear.addColorStop(0, 'rgba(0,0,0,0.25)'); wear.addColorStop(0.5, 'rgba(255,220,200,0.07)'); wear.addColorStop(1, 'rgba(0,0,0,0.25)');
       ctx.fillStyle = wear; ctx.fillRect(RX0, 0, RX1 - RX0, 512);
       for (let i = 0; i < 2600; i++) { ctx.fillStyle = `rgba(${rnd() < 0.5 ? 0 : 255},${rnd() < 0.5 ? 0 : 230},${rnd() < 0.5 ? 0 : 210},0.05)`; ctx.fillRect(RX0 + rnd() * (RX1 - RX0), rnd() * 512, 1, 2); }
-      addNoise(ctx, 512, 512, 12, rnd);
+      addNoise(ctx, 512, 512, 6, rnd);
       return finishTex(c);
     }
+
+    // V6.1 가운데 띠 (방 길이를 따라 반복): 시즌2 배수 철망 / 시즌3 낡은 붉은 카펫
+    function createGrateTexture() {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 256; const ctx = c.getContext('2d');
+      ctx.fillStyle = '#0b0d0d'; ctx.fillRect(0, 0, 256, 256);
+      const g = ctx.createLinearGradient(0, 0, 256, 0); g.addColorStop(0, '#2a3130'); g.addColorStop(0.5, '#3a4342'); g.addColorStop(1, '#2a3130');
+      for (let y = 4; y < 256; y += 32) { ctx.fillStyle = g; ctx.fillRect(14, y, 228, 14); ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(14, y, 228, 2); }
+      ctx.fillStyle = '#454e4c'; ctx.fillRect(0, 0, 14, 256); ctx.fillRect(242, 0, 14, 256);
+      ctx.fillStyle = 'rgba(150,80,30,0.35)'; ctx.fillRect(0, 0, 4, 256); ctx.fillRect(252, 0, 4, 256);
+      const t = finishTex(c); t.wrapS = THREE.ClampToEdgeWrapping; return t;
+    }
+    function createCarpetTexture() {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 512; const ctx = c.getContext('2d'), r = texRng(6606);
+      ctx.fillStyle = '#4a0e14'; ctx.fillRect(0, 0, 256, 512);
+      ctx.fillStyle = '#3a0a10'; ctx.fillRect(18, 0, 18, 512); ctx.fillRect(220, 0, 18, 512);
+      ctx.fillStyle = '#a07a34'; ctx.fillRect(8, 0, 6, 512); ctx.fillRect(242, 0, 6, 512); ctx.fillRect(40, 0, 3, 512); ctx.fillRect(213, 0, 3, 512);
+      for (let y = 0; y < 512; y += 128) { const cy = y + 64; ctx.fillStyle = 'rgba(190,140,60,0.22)'; ctx.beginPath(); ctx.moveTo(128, cy - 44); ctx.lineTo(176, cy); ctx.lineTo(128, cy + 44); ctx.lineTo(80, cy); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#4a0e14'; ctx.beginPath(); ctx.moveTo(128, cy - 30); ctx.lineTo(160, cy); ctx.lineTo(128, cy + 30); ctx.lineTo(96, cy); ctx.closePath(); ctx.fill(); }
+      const wear = ctx.createLinearGradient(0, 0, 256, 0); wear.addColorStop(0, 'rgba(0,0,0,0.3)'); wear.addColorStop(0.5, 'rgba(255,200,180,0.06)'); wear.addColorStop(1, 'rgba(0,0,0,0.3)'); ctx.fillStyle = wear; ctx.fillRect(0, 0, 256, 512);
+      for (let i = 0; i < 5; i++) { const y = r() * 480, h = 14 + r() * 26; ctx.fillStyle = 'rgba(20,10,8,0.55)'; ctx.fillRect(r() < 0.5 ? 0 : 236, y, 20, h); }   // 닳아 찢어진 가장자리
+      addNoise(ctx, 256, 512, 6, r);
+      const t = finishTex(c); t.wrapS = THREE.ClampToEdgeWrapping; return t;
+    }
+    const STRIP_MATS = {};
+    function stripMat(kind) {
+      if (!STRIP_MATS[kind]) {
+        const t = kind === 'grate' ? createGrateTexture() : createCarpetTexture();
+        STRIP_MATS[kind] = new THREE.MeshStandardMaterial({ map: t, roughness: kind === 'grate' ? 0.45 : 0.95, metalness: kind === 'grate' ? 0.55 : 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      }
+      return STRIP_MATS[kind];
+    }
+    // 가운데 띠 폭 (발소리 판정과 같은 값)
+    function centerStripHalf(lay) { return SEASON === 2 ? 0.75 : (SEASON === 3 ? Math.min(1.6, lay.W * 0.19) : 0); }
 
     function createDoorTexture(labelStr, requiresKey = false) {
       const c = document.createElement('canvas');
@@ -1653,21 +1699,36 @@
       c.height = 512;
       const ctx = c.getContext('2d');
 
-      ctx.fillStyle = '#3b2213';
-      ctx.fillRect(0, 0, 256, 512);
-
-      ctx.strokeStyle = '#1f1008';
-      ctx.lineWidth = 8;
-      ctx.strokeRect(20, 24, 216, 200);
-      ctx.strokeRect(20, 254, 216, 224);
-
-      ctx.fillStyle = '#eab308';
-      ctx.beginPath();
-      ctx.roundRect(58, 56, 140, 62, 16);
-      ctx.fill();
-      ctx.strokeStyle = '#fef08a';
-      ctx.lineWidth = 4;
-      ctx.stroke();
+      // V6.1 시즌별 문: 호텔 나무문 / 하수도 철문(리벳·경고 띠) / 성 참나무 판자문(쇠띠)
+      if (SEASON === 2) {
+        ctx.fillStyle = '#3d4a47'; ctx.fillRect(0, 0, 256, 512);
+        ctx.fillStyle = '#4a5855'; ctx.fillRect(14, 14, 228, 484);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(14, 240, 228, 6);
+        ctx.fillStyle = '#9aa5a2'; for (let y = 24; y < 500; y += 46) for (const x of [24, 232]) { ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill(); }
+        for (let i = -2; i < 12; i++) { ctx.fillStyle = i % 2 ? '#151515' : '#d9a91f'; ctx.beginPath(); ctx.moveTo(i * 24, 512); ctx.lineTo(i * 24 + 24, 512); ctx.lineTo(i * 24 + 54, 470); ctx.lineTo(i * 24 + 30, 470); ctx.fill(); }
+        ctx.fillStyle = 'rgba(120,60,20,0.35)'; for (let i = 0; i < 6; i++) ctx.fillRect(20 + i * 37, 250, 5 + (i % 3) * 3, 60 + (i % 4) * 30);
+        ctx.fillStyle = '#e8e4d8'; ctx.beginPath(); ctx.roundRect(58, 56, 140, 62, 6); ctx.fill();
+        ctx.strokeStyle = '#151515'; ctx.lineWidth = 4; ctx.stroke();
+      } else if (SEASON === 3) {
+        for (let x = 0; x < 256; x += 43) { const v = (x * 37) % 17; ctx.fillStyle = `rgb(${70 + v},${46 + v * 0.6},${28 + v * 0.4})`; ctx.fillRect(x, 0, 42, 512); ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(x + 41, 0, 2, 512); }
+        ctx.fillStyle = '#26262a'; for (const y of [140, 360]) { ctx.fillRect(0, y, 256, 22); ctx.fillStyle = '#4a4a50'; for (let x = 16; x < 256; x += 40) { ctx.beginPath(); ctx.arc(x, y + 11, 5, 0, Math.PI * 2); ctx.fill(); } ctx.fillStyle = '#26262a'; }
+        ctx.fillStyle = '#8a6a34'; ctx.beginPath(); ctx.roundRect(58, 56, 140, 62, 10); ctx.fill();
+        ctx.strokeStyle = '#4a3416'; ctx.lineWidth = 4; ctx.stroke();
+      } else {
+        ctx.fillStyle = '#3b2213';
+        ctx.fillRect(0, 0, 256, 512);
+        ctx.strokeStyle = '#1f1008';
+        ctx.lineWidth = 8;
+        ctx.strokeRect(20, 24, 216, 200);
+        ctx.strokeRect(20, 254, 216, 224);
+        ctx.fillStyle = '#eab308';
+        ctx.beginPath();
+        ctx.roundRect(58, 56, 140, 62, 16);
+        ctx.fill();
+        ctx.strokeStyle = '#fef08a';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+      }
 
       ctx.fillStyle = '#0f172a';
       ctx.textAlign = 'center';
@@ -1870,12 +1931,16 @@
       camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 70);
       clock = new THREE.Clock();
 
-      // V5 성능: 터치 기기·저사양 기기는 안티에일리어싱 끄고 픽셀 비율 1.0, 이후 FPS에 따라 자동 조절
+      // V6.1 화면 안정화: 휴대폰·태블릿도 계단 현상이 없도록 안티에일리어싱을 켜고(모바일 GPU는 저렴),
+      // 고해상도 화면에서는 픽셀 비율을 1.0 아래로 내리지 않는다 (예전: 0.65까지 내려가 화면이 깨져 보임)
       const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+      const dpr = window.devicePixelRatio || 1;
       perf.lowPower = coarse || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
-      renderer = new THREE.WebGLRenderer({ antialias: !perf.lowPower, powerPreference: 'high-performance' });
+      perf.maxRatio = Math.min(dpr, perf.lowPower ? 1.25 : 1.5);
+      perf.minRatio = dpr >= 1.5 ? 1.0 : 0.8;
+      renderer = new THREE.WebGLRenderer({ antialias: !(navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2), powerPreference: 'high-performance' });
       renderer.setSize(window.innerWidth, window.innerHeight);
-      perf.ratio = Math.min(window.devicePixelRatio || 1, perf.lowPower ? 1.0 : 1.5);
+      perf.ratio = Math.min(perf.maxRatio, Math.max(perf.minRatio, perf.lowPower ? 1.0 : 1.5));
       renderer.setPixelRatio(perf.ratio);
       container.innerHTML = '';
       container.appendChild(renderer.domElement);
@@ -1935,6 +2000,7 @@
 
       setBgmMode('lobby');
       refreshSavePanel();
+      refreshDifficultyLocks();
       animateLoop();
     }
 
@@ -2001,6 +2067,18 @@
         else if (kind === 'circle') geo = new THREE.CircleGeometry(...args);
         else if (kind === 'cone') geo = new THREE.ConeGeometry(...args);
         else if (kind === 'dodeca') geo = new THREE.DodecahedronGeometry(...args);
+        GEO_CACHE.set(key, geo);
+      }
+      return geo;
+    }
+    function planeGeoTiled(w, h, tile) {
+      const key = 'pt:' + w.toFixed(2) + ':' + h.toFixed(2) + ':' + tile;
+      let geo = GEO_CACHE.get(key);
+      if (!geo) {
+        geo = new THREE.PlaneGeometry(w, h);
+        const uv = geo.attributes.uv;
+        for (let i = 0; i < uv.count; i++) { uv.setX(i, uv.getX(i) * w / tile); uv.setY(i, uv.getY(i) * h / tile); }
+        uv.needsUpdate = true;
         GEO_CACHE.set(key, geo);
       }
       return geo;
@@ -2175,9 +2253,18 @@
         const len = d1 - d0;
         if (len <= 0.01) return;
         const fk = lay.maze ? 'parquet' : floorKindOf(lay.arch);
-        const f = new THREE.Mesh(planeGeo(W, len, Math.max(1, len / 6)), fk === 'hotel' ? mats.floor : floorMat(fk));
+        // V6.1: 반복 무늬 바닥은 4 m마다 한 번씩 (예전엔 방 폭 전체에 한 장을 늘려서 넓은 방에서 흐릿·계단처럼 보였음)
+        const runner = fk === 'hotel' && SEASON === 1;
+        const f = new THREE.Mesh(runner ? planeGeo(W, len, Math.max(1, len / 6)) : planeGeoTiled(W, len, 4), fk === 'hotel' ? mats.floor : floorMat(fk));
         f.rotation.x = -Math.PI / 2;
         at(f, 0, 0, d0 + len / 2);
+        // 시즌2·3: 객실류 방 가운데에 배수 철망 / 카펫 띠 (시즌1 카펫 런너 자리)
+        if (fk === 'hotel' && SEASON > 1 && lay.arch !== 'escape') {
+          const hw = centerStripHalf(lay), kind = SEASON === 2 ? 'grate' : 'carpet';
+          const st = new THREE.Mesh(planeGeo(hw * 2, len, Math.max(1, len / (kind === 'grate' ? 1.5 : 2.6))), stripMat(kind));
+          st.rotation.x = -Math.PI / 2;
+          at(st, 0, 0.004, d0 + len / 2);
+        }
       };
       if (lay.chasm) {
         const c = lay.chasm;
@@ -2245,7 +2332,7 @@
             cr.position.set(rc.x, 0, -rc.d); rGroup.add(cr); break;
           }
           case 'shelf': {
-            const sh = MathDoorsProps.createBookshelf();
+            const sh = SEASON === 2 ? MathDoorsProps.createMetalRack() : MathDoorsProps.createBookshelf();
             sh.position.set(rc.x, 0, -rc.d); rGroup.add(sh); break; // 바닥(y=0)에 정확히 닿게 배치
           }
           case 'podium': {
@@ -2285,6 +2372,9 @@
       });
       (lay.circles || []).forEach(c => {
         if (c.kind === 'pillar') at(new THREE.Mesh(cachedGeo('cyl', c.r * 0.9, c.r, ROOM_H, 14), mats.stone), c.x, ROOM_H / 2, c.d);
+        else if (c.kind === 'readingTable' && SEASON === 2) {
+          const tank = MathDoorsProps.makeBoilerTank(c.r); tank.position.set(c.x, 0, -c.d); rGroup.add(tank);
+        }
         else if (c.kind === 'readingTable') {
           at(new THREE.Mesh(cachedGeo('cyl', c.r, c.r, 0.1, 18), mats.trimWood), c.x, 0.92, c.d);
           at(new THREE.Mesh(cachedGeo('cyl', 0.16, 0.24, 0.9, 10), mats.panelWood), c.x, 0.45, c.d);
@@ -2319,8 +2409,11 @@
       (lay.wallDecor || []).forEach((wd, i) => {
         const wx = wd.side * (W / 2 - 0.16);
         if (wd.type === 'sconce') {
-          const sc = MathDoorsProps.makeWallSconce();
+          const sc = MathDoorsProps.makeSeasonSconce(SEASON);
           sc.position.set(wx, 2.65, -wd.d); sc.rotation.y = wd.side < 0 ? Math.PI / 2 : -Math.PI / 2; rGroup.add(sc);
+        } else if (SEASON > 1) {
+          const art = MathDoorsProps.makeSeasonWallArt(SEASON, i);
+          art.position.set(wx, 2.6, -wd.d); art.rotation.y = wd.side < 0 ? Math.PI / 2 : -Math.PI / 2; rGroup.add(art);
         } else {
           box(0.06, 1.1, 1.5, mats.trimWood, wx - wd.side * 0.02, 2.6, wd.d);
           box(0.04, 0.9, 1.3, mats.paint[i % mats.paint.length], wx - wd.side * 0.05, 2.6, wd.d);
@@ -2352,11 +2445,16 @@
             const kind = (ri + (f > 0 ? 1 : 0)) % 2;
             const pf = across ? 0.06 : 1.5, pd = across ? 1.5 : 0.06;
             const ox = across ? rc.x : rc.x + f * (rc.hw + 0.04), od = across ? rc.d + f * (rc.hd + 0.04) : rc.d;
-            if (kind === 0) {
+            if (kind === 0 && SEASON > 1) {
+              const art = MathDoorsProps.makeSeasonWallArt(SEASON, ri + (f > 0 ? 1 : 0));
+              art.position.set(ox, 2.6, -od);
+              art.rotation.y = across ? (f > 0 ? Math.PI : 0) : (f > 0 ? Math.PI / 2 : -Math.PI / 2);
+              rGroup.add(art);
+            } else if (kind === 0) {
               box(across ? 1.5 : 0.06, 1.1, across ? 0.06 : 1.5, mats.trimWood, ox, 2.6, od);
               box(across ? 1.3 : 0.04, 0.9, across ? 0.04 : 1.3, mats.paint[(ri + f + 2) % mats.paint.length], across ? ox : ox + f * 0.03, 2.6, across ? od + f * 0.03 : od);
             } else {
-              const sc = MathDoorsProps.makeWallSconce();
+              const sc = MathDoorsProps.makeSeasonSconce(SEASON);
               sc.position.set(ox, 2.65, -od);
               sc.rotation.y = across ? (f > 0 ? Math.PI : 0) : (f > 0 ? Math.PI / 2 : -Math.PI / 2);
               rGroup.add(sc);
@@ -2419,10 +2517,12 @@
       // ---- 소품
       (lay.props || []).forEach(p => {
         let obj = null;
-        if (p.type === 'sideTable') obj = MathDoorsProps.makeSideTable();
-        else if (p.type === 'lamp') obj = MathDoorsProps.makeStandingLamp();
-        else if (p.type === 'clock') { obj = MathDoorsProps.makeClock(); obj.rotation.y = p.side < 0 ? Math.PI / 2 : -Math.PI / 2; }
+        // V6.1 시즌별 소품: 호텔 = 화분 탁자·스탠드·괘종시계·침대 / 하수도 = 기름통·작업등·분전반·배수 펌프 / 성 = 나무통·촛대·갑옷·연회 탁자
+        if (p.type === 'sideTable') obj = MathDoorsProps.makeSeasonSideTable(SEASON);
+        else if (p.type === 'lamp') obj = MathDoorsProps.makeSeasonStandingLamp(SEASON);
+        else if (p.type === 'clock') { obj = MathDoorsProps.makeSeasonClock(SEASON); obj.rotation.y = p.side < 0 ? Math.PI / 2 : -Math.PI / 2; }
         else if (p.type === 'crateStack') obj = MathDoorsProps.createCrates();
+        else if (p.type === 'bed' && SEASON > 1) obj = MathDoorsProps.makeSeasonBed(SEASON, p.foot.hw, p.foot.hd);
         else if (p.type === 'bed') {
           obj = new THREE.Group();
           const f = p.foot;
@@ -2875,8 +2975,12 @@
       if (lay.creaks && lay.creaks.some(cr => Math.abs(lx - cr.x) < cr.hw && Math.abs(ld - cr.d) < cr.hd)) return 'wood';
       if (lay.chasm && ld > lay.chasm.d0 - 0.15 && ld < lay.chasm.d1 + 0.15) return 'wood';      // 나무 다리 상판
       if (ld > lay.L + 0.05) return 'wood';                                                       // 문턱
-      if (SEASON === 2) { if (room.roomArch === 'storage') return 'metal'; return Math.abs(lx) < lay.W * 0.117 ? 'metal' : 'stone'; }   // 가운데 배수 철망
-      if (SEASON === 3) { if (room.roomArch === 'storage') return 'metal'; return Math.abs(lx) < lay.W * 0.2 ? 'carpet' : 'stone'; }     // 낡은 카펫 / 판석
+      if (SEASON > 1) {                                                                           // 시즌2 가운데 배수 철망 / 시즌3 낡은 카펫, 나머지는 돌
+        if (room.roomArch === 'storage') return 'metal';
+        const runnerRoom = !lay.maze && floorKindOf(room.roomArch) === 'hotel' && room.roomArch !== 'escape';
+        if (runnerRoom && Math.abs(lx) < centerStripHalf(lay)) return SEASON === 2 ? 'metal' : 'carpet';
+        return 'stone';
+      }
       const k = lay.maze ? 'parquet' : floorKindOf(room.roomArch);
       if (k === 'parquet') return 'wood';     // 지그재그·엇갈린 벽 방: 쪽매 나무 마루
       if (k !== 'hotel') return k;
@@ -3132,6 +3236,7 @@
 
         if (curRoom.unlocked && res.d > curRoom.roomLen + 0.35) onPlayerCrossedDoorThreshold();
       }
+      updatePuzzleBeacon(now);
       if (escState.active) updateEscapeSequence(dt, curRoom);
       else if (curRoom && curRoom.doorNum === maxDoors && curRoom.unlocked && !escState.alarmed) startFinalAlarm(curRoom);
 
@@ -3263,9 +3368,10 @@
       const fps = perf.frames / Math.max(perf.acc, 1e-3);
       perf.frames = 0; perf.acc = 0; perf.checkT = 0;
       perf.lastFps = fps;
-      if (fps < 32 && perf.ratio > 0.65) { perf.ratio = Math.max(0.65, perf.ratio - 0.15); renderer.setPixelRatio(perf.ratio); }
-      else if (fps < 26 && !gfxUserSet && gfxQuality === 'high' && isPlaying && !window.__dtCap) { gfxQuality = 'lite'; applyGraphicsQuality(); }
-      else if (fps > 57 && perf.ratio < Math.min(window.devicePixelRatio || 1, perf.lowPower ? 1.0 : 1.5) - 0.01) { perf.ratio = Math.min(perf.ratio + 0.1, perf.lowPower ? 1.0 : 1.5); renderer.setPixelRatio(perf.ratio); }
+      const minR = window.__minRatio || perf.minRatio || 0.8, maxR = perf.maxRatio || 1.5;   // __minRatio: 자동 테스트(소프트웨어 렌더링)용
+      if (fps < 26 && !gfxUserSet && gfxQuality === 'high' && isPlaying && !window.__dtCap) { gfxQuality = 'lite'; applyGraphicsQuality(); }   // 먼저 무거운 효과를 끄고
+      else if (fps < 30 && perf.ratio > minR + 0.01) { perf.ratio = Math.max(minR, perf.ratio - 0.1); renderer.setPixelRatio(perf.ratio); }   // 그래도 느리면 해상도를 조금씩
+      else if (fps > 52 && perf.ratio < maxR - 0.01) { perf.ratio = Math.min(perf.ratio + 0.1, maxR); renderer.setPixelRatio(perf.ratio); }
     }
 
     // =========================================================================
@@ -4612,12 +4718,14 @@
     }
 
     // 근접 상호작용 버튼: 내용이 바뀔 때만 DOM을 갱신 (매 프레임 레이아웃 계산 방지)
-    let proxKey = '';
+    let proxKey = '', proxBtnHidden = true;
     function setProx(key, icon, html, action) {
       currentProximityAction = action;
-      if (key === proxKey) return;
+      if (key) key = key + '|' + currentDoor + '|' + html;   // 방이 바뀌거나 글이 바뀌면 다시 그림 (같은 key라도 이전 방 문구가 남지 않게)
+      if (key === proxKey && (key || proxBtnHidden)) return;   // 빈 key는 버튼이 실제로 숨겨졌는지까지 확인 (proxKey만 비우고 버튼이 남던 문제)
       proxKey = key;
       const btn = document.getElementById('proximity-btn');
+      proxBtnHidden = !key;
       if (!key) { btn.classList.add('hidden'); btn.classList.remove('flex'); return; }
       document.getElementById('proximity-icon').innerText = icon;
       document.getElementById('proximity-text').innerHTML = html;
@@ -4638,9 +4746,12 @@
       // 1. 옷장 (단, 풀지 않은 단말기가 옷장보다 더 가까우면 단말기를 먼저)
       const danger = rushState.warning || rushState.active || ambushState.warning || ambushState.active || figureState.hunt || (figureState.active && figureState.mode === 'chase');
       const boardD = (!danger && curRoom.boardWorldPos && !curRoom.puzzleSolved && curRoom.roomArch !== 'seek') ? Math.hypot(player.x - curRoom.boardWorldPos.x, player.z - curRoom.boardWorldPos.z) : 99;
+      // V6.1: 서랍이 옷장보다 가까우면 서랍 먼저 (예전엔 옷장이 항상 우선이라 서랍 앞에서 E를 누르면 옷장에 들어가 버림). 위험할 땐 옷장 우선.
+      let drawerD = 99;
+      if (!danger) for (const dr of (curRoom.drawers || [])) drawerD = Math.min(drawerD, Math.hypot(player.x - dr.worldX, player.z - dr.worldZ));
       for (const cObj of (curRoom.closets || [])) {
         const cd = Math.hypot(player.x - cObj.worldX, player.z - cObj.worldZ);
-        if (cd < 2.75 && !(boardD < 2.8 && boardD < cd)) return setProx('closet' + cObj.worldZ, '🚪', '[E / 터치] 옷장 안에 숨기', () => enterClosetManually(cObj));
+        if (cd < 2.75 && !(boardD < 2.8 && boardD < cd) && !(drawerD < 2.25 && drawerD < cd)) return setProx('closet' + cObj.worldZ, '🚪', '[E / 터치] 옷장 안에 숨기', () => enterClosetManually(cObj));
       }
       // 2. 서랍장
       for (let i = 0; i < (curRoom.drawers || []).length; i++) {
@@ -4661,8 +4772,12 @@
       }
       // 3. 수학 제어 단말기
       if (curRoom.boardWorldPos && curRoom.roomArch !== 'seek') {
-        if (Math.hypot(player.x - curRoom.boardWorldPos.x, player.z - curRoom.boardWorldPos.z) < 2.8) {
+        if (Math.hypot(player.x - curRoom.boardWorldPos.x, player.z - curRoom.boardWorldPos.z) < puzzleSpotRange(curRoom)) {
           if (!curRoom.puzzleSolved) {
+            if (curRoom.requiresKey && !curRoom.keyUnlocked) {
+              const it = itemCfg(), need = curRoom.keysNeeded || 1;
+              return setProx('boardItem' + keysCount, it.icon, keysCount >= need ? `[E / 터치] ${it.name} ${need}개 끼우고 장치 켜기` : `[잠김] 이 장치에 ${it.name} ${need}개가 필요해요 (${keysCount}/${need}) — 서랍을 찾아보세요`, () => openPuzzleModal());
+            }
             const txt = curRoom.isBridgeChasmRoom ? '[E / 터치] 다리 연결 제어판 조작하기' : (curRoom.isDupeRoom ? '[E / 터치] 갈림길 단서 단말기 확인' : '[E / 터치] 보안 장치 수학 퍼즐 풀기');
             return setProx('board', '🔐', txt, () => openPuzzleModal());
           }
@@ -4678,6 +4793,8 @@
             if (dObj.lockedOut) return setProx('dupeLocked' + i, '⛔', '가짜였던 문 (다시 열 수 없음)', () => showToast('이미 닫힌 가짜 문입니다. 다른 문을 확인하세요.'));
             return setProx('dupe' + i, '🚪', `[E / 터치] 「${formatMathHTML(dObj.choiceVal)}」 문 열기`, () => interactDupeDoor3D(dObj));
           }
+          // V6.1: 문제는 '장치(패널)' 한 곳에서만 푼다. 문은 잠겨 있다는 안내만 (석상 옆 틈으로 문을 눌러 푸는 우회 차단)
+          if (!curRoom.puzzleSolved && curRoom.boardWorldPos) return setProx('doorLockedInfo' + keysCount, '🔒', `잠김 — ${puzzleSpotName(curRoom)}에서 문제를 풀면 열려요`, () => interactStandardDoor3D(curRoom, dObj));
           if (curRoom.requiresKey && !curRoom.keyUnlocked) { const it = itemCfg(), need = curRoom.keysNeeded || 1; return setProx('doorKey' + keysCount, it.icon, keysCount >= need ? `[E / 터치] ${it.door}` : `[잠김] ${it.where} ${need}개 찾으세요 (${keysCount}/${need})`, () => interactStandardDoor3D(curRoom, dObj)); }
           if (!curRoom.puzzleSolved) return setProx('doorPuzzle', '🔒', '[E / 터치] 잠긴 문 보안 장치 풀기', () => interactStandardDoor3D(curRoom, dObj));
           return setProx('doorOpen', '🚪', '[E / 터치] 문 열기', () => interactStandardDoor3D(curRoom, dObj));
@@ -4746,7 +4863,46 @@
       showToast(`${it.icon} ${it.name}이(가) ${need}개 필요합니다 (지금 ${keysCount}개). 방 안의 서랍을 찾아보세요.`, 2600);
       return false;
     }
+    // 이 방에서 문제를 푸는 곳 (문 옆 패널 / 방 안 장치 / 다리 제어판 / 단서 단말기)
+    // 문 옆 보안 패널은 문 가장자리에서 0.65 m 옆이라, 패널 앞에 서야만 작동하도록 범위를 좁힌다 (문 한가운데 앞에서는 문 안내만)
+    function puzzleSpotRange(room) { const t = room.layout && room.layout.terminal; return t && t.mode === 'keypad' ? 1.5 : 2.8; }
+    function puzzleSpotName(room) {
+      if (room.isBridgeChasmRoom) return '절벽 앞 다리 제어판';
+      if (room.isDupeRoom) return '단서 단말기';
+      const t = room.layout && room.layout.terminal;
+      if (t && t.mode === 'keypad') return '문 옆 보안 패널';
+      const dv = room.layout && room.layout.device;
+      if (dv && dv.type === 'monolith') return '석문을 움직이는 장치';
+      return '방 안의 수학 장치';
+    }
+    // 문제 푸는 곳을 잠깐 표시 (위에서 내려오는 노란 화살표 + 장치 화면 깜빡임)
+    let puzzleBeacon = null, puzzleBeaconUntil = 0;
+    function flashPuzzleSpot(room) {
+      if (!room || !room.boardWorldPos || room.puzzleSolved) return;
+      if (!puzzleBeacon) {
+        puzzleBeacon = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.45, 4), new THREE.MeshBasicMaterial({ color: 0xfbbf24 }));
+        puzzleBeacon.rotation.x = Math.PI; scene.add(puzzleBeacon);
+      }
+      puzzleBeacon.position.set(room.boardWorldPos.x, 2.6, room.boardWorldPos.z);
+      puzzleBeacon.userData.baseY = 2.6; puzzleBeacon.visible = true;
+      puzzleBeaconUntil = performance.now() + 3500;
+    }
+    function updatePuzzleBeacon(now) {
+      if (!puzzleBeacon || !puzzleBeacon.visible) return;
+      const r = activeRooms[currentDoor];
+      if (now > puzzleBeaconUntil || !r || r.puzzleSolved) { puzzleBeacon.visible = false; return; }
+      puzzleBeacon.position.y = puzzleBeacon.userData.baseY + Math.sin(now * 0.008) * 0.15;
+      puzzleBeacon.rotation.y = now * 0.003;
+    }
     function interactStandardDoor3D(curRoom, dObj) {
+      if (!curRoom.puzzleSolved && curRoom.boardWorldPos) {
+        playSfx('doorLocked', 0.8);
+        const it = itemCfg(), need = curRoom.keysNeeded || 1;
+        const items = (curRoom.requiresKey && !curRoom.keyUnlocked) ? ` (먼저 ${it.icon} ${it.name} ${need}개가 필요해요)` : '';
+        showToast(`🔒 문은 잠겨 있어요. ${puzzleSpotName(curRoom)}에서 문제를 풀면 열립니다.${items}`, 2800);
+        flashPuzzleSpot(curRoom);
+        return;
+      }
       if (curRoom.requiresKey && !curRoom.keyUnlocked) {
         if (tryUseRoomItems(curRoom)) openPuzzleModal();
         return;
@@ -5414,6 +5570,9 @@
         return;
       }
       if (!uiOpen.puzzle) {
+        const r = activeRooms[currentDoor];
+        const near = r && r.boardWorldPos && Math.hypot(player.x - r.boardWorldPos.x, player.z - r.boardWorldPos.z) < puzzleSpotRange(r);
+        if (!near) { showToast(r && r.boardWorldPos && !r.puzzleSolved ? `📜 단서 쪽지는 ${puzzleSpotName(r)} 앞에서 문제를 연 뒤에 쓸 수 있어요.` : '📜 지금은 단서를 쓸 문제가 없어요.', 2600); if (r) flashPuzzleSpot(r); return; }
         openPuzzleModal();
         if (!uiOpen.puzzle) return;
       }
@@ -5487,21 +5646,22 @@
 
       setBgmMode(roomAudioMode(room));
       if (room.roomArch === 'darkRoom') {
-        objBanner.innerText = "어두운 구역입니다. 단말기를 찾아 문을 여세요.";
+        { const w = puzzleSpotName(room), c = w.charCodeAt(w.length - 1); objBanner.innerText = `어두운 구역입니다. ${w}${(c >= 0xAC00 && (c - 0xAC00) % 28) ? '을' : '를'} 찾아 문제를 푸세요.`; }
         if (!flashlightOn) showSubtleSubtitle(["너무 어둡다… 손전등(F)을 켜 보자."], 1);
       } else if (room.requiresKey && !room.keyUnlocked) {
-        objBanner.innerText = "곁방의 서랍에서 열쇠를 찾아 잠긴 문을 여세요.";
+        { const it = itemCfg(); objBanner.innerText = `서랍에서 ${it.icon} ${it.name} ${room.keysNeeded || 1}개를 찾아 ${puzzleSpotName(room)}에 끼우고 문제를 푸세요.`; }
       } else if (room.isBridgeChasmRoom && !room.bridgeExtended) {
         objBanner.innerText = "제어판을 조작해 끊어진 다리를 연결하세요.";
       } else if (room.isDupeRoom) {
         objBanner.innerText = "단말기의 문제를 풀고, 정답이 적힌 문을 여세요.";
       } else if (room.layout.secret && !room.layout.secret.sideRoom) {
-        objBanner.innerText = "보안 장치를 풀고 문을 여세요. 벽 틈 어딘가에 비밀방이 있다는 소문이…";
+        objBanner.innerText = `${puzzleSpotName(room)}에서 문제를 풀어 문을 여세요. 벽 틈 어딘가에 비밀방이 있다는 소문이…`;
       } else if (room.layout.device && room.layout.device.type === 'monolith') {
-        objBanner.innerText = "출구를 막은 석상을 장치로 움직이세요.";
+        objBanner.innerText = "출구를 막은 석문은 방 안의 장치에서 문제를 풀어야 움직여요.";
       } else {
-        objBanner.innerText = "주변을 살펴 단서를 찾고 잠긴 문을 여세요.";
+        objBanner.innerText = `${puzzleSpotName(room)}에서 문제를 풀어 잠긴 문을 여세요.`;
       }
+      if (!carry && !room.puzzleSolved) setTimeout(() => { if (isPlaying && currentDoor === room.doorNum) flashPuzzleSpot(room); }, 900);   // 들어오면 문제 푸는 곳을 잠깐 표시
       if (room.doorNum <= 1) return;
       if (carry) { if (rushState.active || ambushState.active) setBgmMode('rush'); return; }  // 따라온 괴물만 상대 (이 방의 새 이벤트는 생략)
 
@@ -5580,6 +5740,7 @@
           showToast("최소 1개 이상의 출제 단원을 선택해 주세요!");
           return;
         }
+        if (!diffUnlocked(gameDifficulty)) { selectDifficulty(gameDifficulty); refreshDifficultyLocks(); return; }
         restore = null;
       }
 
@@ -5722,6 +5883,7 @@
       document.getElementById('result-screen').classList.add('hidden');
       document.getElementById('result-screen').classList.remove('flex');
       document.getElementById('lobby-screen').classList.remove('hidden');
+      refreshDifficultyLocks();
       setBgmMode('lobby');
       refreshSavePanel();
     }
@@ -5790,6 +5952,7 @@
       if (escState.wallMesh) { scene.remove(escState.wallMesh); escState.wallMesh.traverse(o => { if (o.geometry && o.geometry.type === 'BoxGeometry') o.geometry.dispose(); }); escState.wallMesh = null; }
       escState.rocks = [];
       const h = document.getElementById('escape-hud'); if (h) h.classList.add('hidden');
+      if (puzzleBeacon) puzzleBeacon.visible = false;
       if (full) { escState.alarmed = false; endFieldCutscene(); const w = document.getElementById('whiteout'); if (w) w.style.opacity = '0'; }
     }
     function completeEscape() {
@@ -5907,15 +6070,18 @@
       const contBtn = document.getElementById('result-continue-btn');
       contBtn.classList.add('hidden');
 
+      let newlyOpened = '';
       if (isWin) {
         playSfx('win');
         Core.SaveManager.clear();
+        if (markSeasonCleared(SEASON) && SEASON < 3) newlyOpened = SEASON === 1 ? 'normal' : 'challenge';
+        refreshDifficultyLocks();
         badge.innerText = '🏆';
         badge.className = "w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4 border-4 border-emerald-400 bg-emerald-950/60";
         title.innerText = seasonCfg().win;
         title.className = "title-font text-4xl sm:text-6xl text-emerald-400 mb-3";
         desc.innerHTML = `축하합니다! ${maxDoors}개의 모든 방과 수학 장치를 돌파하고 <b>${seasonCfg().place}</b>에서 탈출했습니다!` +
-          (seasonCfg().teaser ? `<br><span class="block mt-3 text-slate-400 text-sm italic">${seasonCfg().teaser}</span><span class="block mt-1 text-amber-300/80 text-xs">다음 이야기: ${SEASONS[SEASON + 1].tag} — 난이도 '${SEASON === 1 ? '보통' : '도전'}'으로 시작</span>` : `<br><span class="block mt-3 text-slate-500 text-xs">바람이 분다. 따뜻한 햇살. …아주 잠깐, 하늘이 깜빡였던 것 같다.</span>`);
+          (seasonCfg().teaser ? `<br><span class="block mt-3 text-slate-400 text-sm italic">${seasonCfg().teaser}</span><span class="block mt-1 text-amber-300/80 text-xs">다음 이야기: ${SEASONS[SEASON + 1].tag} — 난이도 '${SEASON === 1 ? '보통' : '도전'}'으로 시작</span>` + (newlyOpened ? `<span class="block mt-2 text-emerald-300 font-black text-sm">🔓 '${DIFF_NAME[newlyOpened]}' 단계가 열렸습니다!</span>` : '') : `<br><span class="block mt-3 text-slate-500 text-xs">바람이 분다. 따뜻한 햇살. …아주 잠깐, 하늘이 깜빡였던 것 같다.</span>`);
       } else {
         badge.innerText = '💀';
         badge.className = "w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4 border-4 border-rose-500 bg-rose-950/60";

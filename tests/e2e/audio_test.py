@@ -33,6 +33,7 @@ async def main():
     pg.on('requestfailed', lambda r: failed_req.append(r.url))
     await pg.route('**/fonts.googleapis.com/**', lambda r: r.abort())  # 샌드박스는 외부 글꼴 접속 불가 → 의도적으로 차단
     await pg.add_init_script('window.__noPointerLock = true;')  # 헤드리스 포인터 잠금은 화면 합성을 크게 느리게 함 (마우스 둘러보기는 mouselook_test.py)
+    await pg.add_init_script("try { localStorage.setItem('mathDoorsCleared', '3'); } catch (e) {}")   # 단계 잠금 해제
     await pg.goto(BASE)
     await pg.wait_for_function("window.MathDoorsAudio && typeof activeRooms !== 'undefined'", timeout=20000)
     await pg.wait_for_timeout(1500)
